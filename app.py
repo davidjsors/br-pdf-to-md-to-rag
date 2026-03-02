@@ -35,33 +35,16 @@ with st.sidebar:
     st.divider()
     st.info("Desenvolvido para a comunidade de IA do Brasil. 🇧🇷")
 
-    st.divider()
-    st.header("⚙️ Configurações do Motor")
-    motor = st.radio(
-        "Escolha o Motor de Extração:",
-        ("Padrão (pdfplumber)", "Microsoft MarkItDown (Avançado)"),
-        help="MarkItDown suporta OCR de PDFs escaneados (imagens), planilhas Excel e arquivos Word."
-    )
-    
-    api_key = None
-    if motor == "Microsoft MarkItDown (Avançado)":
-        api_key = st.text_input(
-            "OpenAI API Key (Opcional para OCR)", 
-            type="password",
-            help="Forneça uma chave de API (ex: gpt-4o) se o seu PDF for 'escaneado' (imagem) para ativar o OCR visual do MarkItDown."
-        )
-
 # Main Content
 st.title("BR-PDF-to-MD-to-RAG 🇧🇷📄")
 st.markdown("#### Conversor e Limpador de PDFs brasileiros para Markdown otimizado para RAG")
 
-uploaded_file = st.file_uploader("Arraste ou selecione seu PDF (ou arquivo Office se estiver usando o MarkItDown)", type=["pdf", "xlsx", "docx"])
+uploaded_file = st.file_uploader("Arraste ou selecione seu PDF aqui", type=["pdf"])
 
 if uploaded_file is not None:
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_dir_path = Path(temp_dir)
         
-        # Manter a extensão original para o MarkItDown funcionar com Excel/Word
         file_path = temp_dir_path / uploaded_file.name
         output_dir = temp_dir_path / "output"
         output_dir.mkdir(exist_ok=True)
@@ -71,69 +54,56 @@ if uploaded_file is not None:
             f.write(uploaded_file.getbuffer())
         
         start_time = time.time()
-        with st.spinner('Limpando ruídos e estruturando Markdown... 🧹⚙️'):
-            if motor == "Padrão (pdfplumber)":
-                if not file_path.suffix.lower() == ".pdf":
-                    st.error("O motor padrão só suporta arquivos PDF. Use o MarkItDown para outros formatos.")
-                    success = False
-                else:
-                    success = process_pdf(file_path, output_dir)
-            else:
-                from src.parser_markitdown import process_with_markitdown
-                success = process_with_markitdown(file_path, output_dir, api_key)
+        with st.spinner('O Juiz está avaliando as extrações dos especialistas... ⚖️⚙️'):
+            # Agora process_pdf retorna um dicionário com estatísticas do Ensemble
+            result = process_pdf(file_path, output_dir)
                 
         duration = time.time() - start_time
             
-        if success:
-            md_filename = file_path.stem + ".md"
-            md_path = output_dir / md_filename
+        if result.get("success"):
+            md_path = result["md_path"]
+            winner = result["winner"]
+            ensemble_stats = result["stats"]
             
             if md_path.exists():
                 with open(md_path, "r", encoding="utf-8") as f:
                     md_content = f.read()
                 
-                # Estatísticas simples
+                # Estatísticas
                 num_chars = len(md_content)
-                num_tables = md_content.count("| --- |") # Heurística simples
+                num_tables = md_content.count("| --- |")
                 
-                # Calculando o Score de Qualidade MDEval Estrutural (Simulação/Baseline)
-                # Como não temos um "gabarito perfeito" do usuário, avaliamos a integridade das tags geradas.
-                # Um proxy de score: Garantiremos que há uma boa densidade de tags estruturais.
-                # (Em um pipeline de RAG real, aqui você injetaria o Ground Truth para fine-tuning)
                 html_tags = extract_html_tags(markdown.markdown(normalize_math(md_content), extensions=['tables']))
                 structural_density = min(100.0, float(len(html_tags)) * 1.5) if len(html_tags) > 0 else 0.0
                 
-                st.success(f"Concluído em {duration:.2f}s! ✨")
+                st.success(f"Concluído em {duration:.2f}s! ✨ Juiz escolheu: **{winner}**")
                 
-                # Layout de colunas para métricas (Adicionando o Score MDEval)
+                # Layout de colunas para métricas (Visão Ensemble)
                 m1, m2, m3, m4 = st.columns(4)
-                m1.metric("Caracteres extraídos", f"{num_chars:,}")
-                m2.metric("Tabelas identificadas", num_tables)
-                m3.metric("Densidade Estrutural", f"{structural_density:.0f}%", help="Indica a presença de elementos estruturais (títulos, tabelas, listas) identificados. Quanto maior, melhor para o RAG.")
-                m4.metric("Status", "Limpo 🧹")
+                m1.metric("Páginas PDF", ensemble_stats.get("total_pages", 0))
+                m2.metric("Blocos de Texto", ensemble_stats.get("text_blocks_found", 0), help="Processados via MarkItDown.")
+                m3.metric("Tabelas Injetadas", ensemble_stats.get("tables_identified", 0), help="Tabelas de alta precisão extraídas via pdfplumber.")
+                m4.metric("Saúde Estrutural", f"{structural_density:.0f}%", help="Score MDEval: Riqueza de tags Markdown no arquivo final.")
 
                 st.divider()
                 
-                # Exibir colunas com Resultados
                 col1, col2 = st.columns(2)
                 
                 with col1:
-                    st.markdown("### 👀 Renderizado (Preview)")
+                    st.subheader("👀 Renderizado (Preview)")
                     with st.container(height=500, border=True):
                         st.markdown(md_content)
-                    
+                
                 with col2:
-                    st.markdown("### 📝 Código Markdown")
+                    st.subheader("📝 Código Markdown")
                     with st.container(height=500, border=True):
                         st.code(md_content, language="markdown")
                 
-                st.divider()
-                
-                # Botão de download de destaque
+                # Download button
                 st.download_button(
-                    label="📥 Baixar Markdown (.md) Otimizado",
+                    label="Baixar Markdown Limpo 📥",
                     data=md_content,
-                    file_name=md_filename,
+                    file_name=md_path.name,
                     mime="text/markdown",
                     use_container_width=True,
                     type="primary"
@@ -141,8 +111,8 @@ if uploaded_file is not None:
             else:
                 st.error("Erro interno: o arquivo MD não foi gerado.")
         else:
-            st.error("Falha na interpretação e conversão do PDF.")
+            st.error(f"Erro no processamento: {result.get('error', 'Erro desconhecido')}")
 else:
     # Boas vindas/Placeholder
-    st.info("Aguardando upload de arquivo PDF para iniciar a limpeza...")
+    st.info("Aguardando upload do PDF para aplicar o motor Ensemble... 🚀")
     st.image("https://img.icons8.com/clouds/200/000000/pdf.png")

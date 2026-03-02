@@ -16,18 +16,15 @@ Ferramentas generalistas abordam a conversão mapeando o conteúdo visual para o
 
 O **BR-PDF-to-MD** não extrai tudo "assim como está", mas sim aplicando uma camada super densa de limpeza (**cleaner semantic**) voltada unicamente à **sanitização em português pt-BR**.
 
-- ✅ **Limpador de Eixos e Escalas:** Regex calibrado para detectar e remover irrelevâncias estruturais que são muito comuns em pdfs.
-- ✅ **Sanitização Semântica pt-BR:** Repara união de palavras que foram cortadas pelo design e faz o "glue" de frases quebradas no meio.
-- ✅ **Extração Integrada Tabela-para-Markdown:** O contexto tabular mantém seus grids originais extraídas via *pdfplumber*.
-- ✅ **Motores Duplos (Dual-Engine):** Você pode escolher entre extração rápida (pdfplumber) ou extração avançada com OCR e formatos Office via **Microsoft MarkItDown**.
-- ✅ **Limpador Modular:** Você já possui seu pipeline de parser? Ok! Utilize apenas `cleaner` puxando a camada de sanitização das strings e pronto.
+## ⚖️ O Comitê de Especialistas (Interleaved Ensemble)
 
-## 🚀 Dois Motores à sua Escolha
+Não utilizamos apenas um motor, mas sim um **Comitê Orquestrado** que atua em 3 fases:
 
-Na nova interface, você pode selecionar qual motor "lê" o seu arquivo antes do nosso limpador agir:
-
-1. **Padrão (pdfplumber)**: Incrivelmente rápido e gratuito. Lê o texto "nativo" do PDF. Se o PDF for escaneado (foto), ele retornará vazio.
-2. **Microsoft MarkItDown**: O novo motor avançado da Microsoft. Lê não apenas PDFs, mas planilhas (Excel) e documentos (Word). Se você fornecer uma **OpenAI API Key**, liga o OCR alimentado pelo ChatGPT para ler documentos completamente escaneados!
+1.  **Fase de Identificação (O Radar)**: O *pdfplumber* varre cada página do PDF para identificar onde estão as áreas de tabelas e onde está o fluxo de texto.
+2.  **Fase de Delegação (Os Especialistas)**: 
+    *   **Prosa e Títulos**: O *Microsoft MarkItDown* é encarregado de reconstruir a narrativa, identificando `# Títulos` e `## Subtítulos` com precisão semântica.
+    *   **Grids e Dados**: O *pdfplumber* (nosso especialista em coordenadas) é encarregado de extrair as tabelas brasileiras com precisão absoluta.
+3.  **Fase de Reunião (A Síntese do Juiz)**: O Juiz Híbrido recebe as entregas de ambos e sintetiza um documento final robusto, injetando as tabelas de alta precisão no fluxo narrativo estruturado.
 
 ---
 

@@ -27,9 +27,9 @@ O **BR-PDF-to-MD** não extrai tudo "assim como está", mas sim aplicando uma ca
 
 Para você que quer usar a ferramenta sem instalar nada:
 
-[ ![Abra no Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg) ](https://share.streamlit.io/)
+[ ![Abra no Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg) ](https://pdf2md2rag.streamlit.app/)
 
-> **Nota:** Se você for o dono do repo, basta conectar seu GitHub ao [Streamlit Community Cloud](https://streamlit.io/cloud) e apontar para o arquivo `app.py`. A hospedagem para projetos open-source é **gratuita**.
+> **Nota:** Este app está hospedado no [Streamlit Community Cloud](https://streamlit.io/cloud). A hospedagem para projetos open-source é **gratuita**.
 
 ## 💻 Instalação Local e CLI
 

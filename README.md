@@ -19,7 +19,15 @@ O **BR-PDF-to-MD** não extrai tudo "assim como está", mas sim aplicando uma ca
 - ✅ **Limpador de Eixos e Escalas:** Regex calibrado para detectar e remover irrelevâncias estruturais que são muito comuns em pdfs.
 - ✅ **Sanitização Semântica pt-BR:** Repara união de palavras que foram cortadas pelo design e faz o "glue" de frases quebradas no meio.
 - ✅ **Extração Integrada Tabela-para-Markdown:** O contexto tabular mantém seus grids originais extraídas via *pdfplumber*.
-- ✅ **Modular (Limpador "Standalone"):** Você já possui seu pipeline de parser? Ok! Utilize apenas `cleaner` puxando a camada de sanitização das strings e pronto.
+- ✅ **Motores Duplos (Dual-Engine):** Você pode escolher entre extração rápida (pdfplumber) ou extração avançada com OCR e formatos Office via **Microsoft MarkItDown**.
+- ✅ **Limpador Modular:** Você já possui seu pipeline de parser? Ok! Utilize apenas `cleaner` puxando a camada de sanitização das strings e pronto.
+
+## 🚀 Dois Motores à sua Escolha
+
+Na nova interface, você pode selecionar qual motor "lê" o seu arquivo antes do nosso limpador agir:
+
+1. **Padrão (pdfplumber)**: Incrivelmente rápido e gratuito. Lê o texto "nativo" do PDF. Se o PDF for escaneado (foto), ele retornará vazio.
+2. **Microsoft MarkItDown**: O novo motor avançado da Microsoft. Lê não apenas PDFs, mas planilhas (Excel) e documentos (Word). Se você fornecer uma **OpenAI API Key**, liga o OCR alimentado pelo ChatGPT para ler documentos completamente escaneados!
 
 ---
 

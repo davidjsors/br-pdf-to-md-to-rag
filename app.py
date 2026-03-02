@@ -35,30 +35,57 @@ with st.sidebar:
     st.divider()
     st.info("Desenvolvido para a comunidade de IA do Brasil. 🇧🇷")
 
+    st.divider()
+    st.header("⚙️ Configurações do Motor")
+    motor = st.radio(
+        "Escolha o Motor de Extração:",
+        ("Padrão (pdfplumber)", "Microsoft MarkItDown (Avançado)"),
+        help="MarkItDown suporta OCR de PDFs escaneados (imagens), planilhas Excel e arquivos Word."
+    )
+    
+    api_key = None
+    if motor == "Microsoft MarkItDown (Avançado)":
+        api_key = st.text_input(
+            "OpenAI API Key (Opcional para OCR)", 
+            type="password",
+            help="Forneça uma chave de API (ex: gpt-4o) se o seu PDF for 'escaneado' (imagem) para ativar o OCR visual do MarkItDown."
+        )
+
 # Main Content
 st.title("BR-PDF-to-MD-to-RAG 🇧🇷📄")
 st.markdown("#### Conversor e Limpador de PDFs brasileiros para Markdown otimizado para RAG")
 
-uploaded_file = st.file_uploader("Arraste ou selecione seu PDF aqui", type="pdf")
+uploaded_file = st.file_uploader("Arraste ou selecione seu PDF (ou arquivo Office se estiver usando o MarkItDown)", type=["pdf", "xlsx", "docx"])
 
 if uploaded_file is not None:
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_dir_path = Path(temp_dir)
-        pdf_path = temp_dir_path / uploaded_file.name
+        
+        # Manter a extensão original para o MarkItDown funcionar com Excel/Word
+        file_path = temp_dir_path / uploaded_file.name
         output_dir = temp_dir_path / "output"
         output_dir.mkdir(exist_ok=True)
         
-        # Salvando PDF enviado
-        with open(pdf_path, "wb") as f:
+        # Salvando arquivo enviado
+        with open(file_path, "wb") as f:
             f.write(uploaded_file.getbuffer())
         
         start_time = time.time()
         with st.spinner('Limpando ruídos e estruturando Markdown... 🧹⚙️'):
-            success = process_pdf(pdf_path, output_dir)
+            if motor == "Padrão (pdfplumber)":
+                if not file_path.suffix.lower() == ".pdf":
+                    st.error("O motor padrão só suporta arquivos PDF. Use o MarkItDown para outros formatos.")
+                    success = False
+                else:
+                    success = process_pdf(file_path, output_dir)
+            else:
+                from src.parser_markitdown import process_with_markitdown
+                success = process_with_markitdown(file_path, output_dir, api_key)
+                
         duration = time.time() - start_time
             
         if success:
-            md_filename = pdf_path.stem + ".md"
+            md_filename = file_path.stem + ".md"
             md_path = output_dir / md_filename
             
             if md_path.exists():

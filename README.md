@@ -81,5 +81,21 @@ print(texto_limpo)
 
 Pull requests são super bem-vindos. Fique à vontade para submeter suas heurísticas `regex` pra filtrar ainda mais casos "exóticos" dos PDFs de cartilhas contábeis BR.
 
+## Referências e Créditos
+
+Este projeto integra heurísticas e métricas inspiradas no **MDEval-Benchmark**, um framework acadêmico para avaliar a consciência de Markdown em LLMs.
+
+**Citação Original:**
+```bibtex
+@inproceedings{chen2025mdeval,
+  title={MDEval: Evaluating and Enhancing Markdown Awareness in Large Language Models},
+  author={Zhongpu Chen and Yinfeng Liu and Long Shi and Zhi-Jie Wang and Xingyan Chen and Yu Zhao and Fuji Ren},
+  booktitle={Proceedings of the ACM Web Conference},
+  year={2025}
+}
+```
+
+Agradecemos ao grupo **SWUFE-DB-Group** pelo compartilhamento do benchmark [MDEval](https://github.com/SWUFE-DB-Group/MDEval-Benchmark).
+
 ## Licença
 [MIT](LICENSE)

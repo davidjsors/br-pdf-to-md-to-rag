@@ -1,9 +1,11 @@
 import streamlit as st
 import tempfile
 import time
+import markdown
 from pathlib import Path
 
 from src.parser import process_pdf
+from src.metrics.eval_metrics import calculate_structural_similarity, extract_html_tags, normalize_math
 
 st.set_page_config(
     page_title="BR-PDF-to-MD-to-RAG", 
@@ -23,6 +25,9 @@ with st.sidebar:
     - 🧹 **Eixos de Gráficos**: Sequências numéricas que poluem o RAG.
     - 🧹 **Hifenização**: Reconstruímos palavras cortadas no fim da linha.
     - 🧹 **Cabeçalhos Repetidos**: Evitamos duplicidade de títulos.
+    
+    ### Métrica de Qualidade:
+    Utilizamos métricas de densidade estrutural inspiradas no framework acadêmico **MDEval-Benchmark (WWW '25)**.
     
     ### Por que Markdown?
     Markdown é o formato ideal para **LLMs** e **Vector Databases**, pois preserva a estrutura (tabelas, títulos) sem o overhead visual do PDF.
@@ -64,13 +69,21 @@ if uploaded_file is not None:
                 num_chars = len(md_content)
                 num_tables = md_content.count("| --- |") # Heurística simples
                 
+                # Calculando o Score de Qualidade MDEval Estrutural (Simulação/Baseline)
+                # Como não temos um "gabarito perfeito" do usuário, avaliamos a integridade das tags geradas.
+                # Um proxy de score: Garantiremos que há uma boa densidade de tags estruturais.
+                # (Em um pipeline de RAG real, aqui você injetaria o Ground Truth para fine-tuning)
+                html_tags = extract_html_tags(markdown.markdown(normalize_math(md_content), extensions=['tables']))
+                structural_density = min(100.0, float(len(html_tags)) * 1.5) if len(html_tags) > 0 else 0.0
+                
                 st.success(f"Concluído em {duration:.2f}s! ✨")
                 
-                # Layout de colunas para métricas
-                m1, m2, m3 = st.columns(3)
+                # Layout de colunas para métricas (Adicionando o Score MDEval)
+                m1, m2, m3, m4 = st.columns(4)
                 m1.metric("Caracteres extraídos", f"{num_chars:,}")
                 m2.metric("Tabelas identificadas", num_tables)
-                m3.metric("Status", "Limpo 🧹")
+                m3.metric("Densidade Estrutural", f"{structural_density:.0f}%", help="Indica a presença de elementos estruturais (títulos, tabelas, listas) identificados. Quanto maior, melhor para o RAG.")
+                m4.metric("Status", "Limpo 🧹")
 
                 st.divider()
                 

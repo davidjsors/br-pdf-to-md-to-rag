@@ -79,6 +79,7 @@ def judge_narrative(pdf_path: Path, manifest: DocumentManifest) -> StageResult:
         content=final_narrative,
         metadata={
             "winner": winner,
+            "filename": pdf_path.name,
             "markitdown_chars": len(md_markitdown),
             "pymupdf_chars": len(md_pymupdf),
             "score_mit": score_mit,

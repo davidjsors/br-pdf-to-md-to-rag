@@ -1,8 +1,10 @@
 # ADR-0001: Adoção do OpenDataLoader-PDF (ODL) para Bounding Boxes e Parser Híbrido
 
 ## Status
+Status: Superseded (Substituído pela Stack Lite em 2026-03-03)
 
-Accepted
+> [!CAUTION]
+> **REMOVIDO:** O suporte ao OpenDataLoader foi removido da pipeline em 03/03/2026 devido ao alto custo computacional e latência incompatível com o ambiente Cloud, além de degradação estrutural em PDFs técnicos. O projeto retornou ao Ensemble Bimodal (MarkItDown + PyMuPDF4LLM).
 
 ## Context
 
@@ -14,7 +16,6 @@ Além disso, tínhamos ferramentas pesadíssimas de Inteligência Artificial VLM
 
 ## Decision Drivers
 
-* **Manter arquitetura Lite (CPU-Only)** para fácil deploy em clouds genéricas.
 * **Preservar 100% da integridade da informação** evitando que OCRs falhos sumam com parágrafos.
 * **Resolução Geométrica Cirúrgica** (XY coords) que viabilize o recorte exato do PDF para os Especialistas.
 

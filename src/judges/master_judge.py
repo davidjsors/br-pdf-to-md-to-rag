@@ -53,6 +53,26 @@ def synthesize_master(
     evaluator = StructuralDensityEvaluator()
     score = evaluator.evaluate(final_output)
 
+    # 5. Injeção de Roteamento Determinístico (Frontmatter YAML)
+    print("[Juiz Mestre] Acoplando metadados estruturais para RAG (Frontmatter YAML)...")
+    from datetime import datetime
+    original_filename = narrative_res.metadata.get("filename", "documento_extraido.pdf").replace(".pdf", "")
+    safe_title = re.sub(r'[^A-Za-z0-9_ -]', '', original_filename)
+    
+    frontmatter = (
+        "---\n"
+        f"title: {safe_title}\n"
+        "extraction_engine: Orquestrador V2 - BR-PDF-to-MD-to-RAG\n"
+        f"source_file: {original_filename}\n"
+        f"processing_date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+        f"total_characters: {len(final_output)}\n"
+        f"tables_injected: {len(data_res.tables)}\n"
+        f"visual_blocks: {len(vision_res.visuals)}\n"
+        f"mdeval_score: {score}\n"
+        "---\n\n"
+    )
+    final_output = frontmatter + final_output
+
     # Levantar compilação de Winners para o front
     narrative_winner = narrative_res.metadata.get("winner", "N/A")
     data_winner = data_res.metadata.get("winner", "N/A") if not data_res.metadata.get("skipped") else "Skipped (Sem Matrizes)"

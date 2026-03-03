@@ -38,4 +38,22 @@ def clean_text_block(text: str) -> str:
     # 8. Limpeza final de pontuação repetida (ruído de extração)
     text = re.sub(r'([\.?!,;])\1+', r'\1', text)
     
+    # 9. Injetar Headers em documentos "flat" (Heurística de Prontidão RAG)
+    # Promove linhas ALL CAPS isoladas (10 a 120 caracteres) para H2
+    def promote_caps_to_h2(match):
+        line = match.group(0).strip()
+        if len(line.split()) < 2:
+            return line
+        if re.match(r'^[\d\s\.,\-]+$', line):
+            return line
+        return f"\n## {line}\n"
+
+    text = re.sub(r'^[A-ZÀ-Ú0-9\s,\.\-\/]{10,120}$', promote_caps_to_h2, text, flags=re.MULTILINE)
+    
+    # Promove "Assunto: " explícito para H3
+    text = re.sub(r'^(Assunto:[^\n]+)$', r'\n### \1\n', text, flags=re.MULTILINE | re.IGNORECASE)
+
+    # Promove linhas inteiras com Negrito (do PyMuPDF) para H3
+    text = re.sub(r'^\*\*([^\*]{5,120})\*\*\s*$', r'\n### \1\n', text, flags=re.MULTILINE)
+    
     return text.strip()

@@ -26,6 +26,8 @@ Nossa abordagem não extrai tudo "assim como está". Nós utilizamos **8 ferrame
 | **3. Visual** | `Vision Judge` | `marker-pdf`, `pytesseract` | Opcional: Processa páginas escaneadas puras através de Visão Computacional. |
 | **4. Validação** | `Master Judge` | `MDEval` (Algoritmo) | Funde as tabelas da Etapa 2 dentro da Narrativa da Etapa 1. Calcula a **Saúde Estrutural** na métrica acadêmica e aprova. |
 
+> **📜 Documentação Profunda:** Para o passo a passo completo da jornada do documento (incluindo Radar, Injeção de Heurísticas PT-BR nas ancoragens YAML) [Leia a Arquitetura da Pipeline V2 aqui](docs/pipeline_architecture_v2.md) (Para fins de documentação do agente: veja o nosso arquivo gerado `pipeline_architecture_v2.md`).
+
 ---
 
 ## 🧬 O Avaliador de Saúde Estrutural (MDEval Custom)

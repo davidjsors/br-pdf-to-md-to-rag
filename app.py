@@ -41,191 +41,185 @@ st.markdown("#### Conversor e Limpador de PDFs brasileiros para Markdown otimiza
 
 uploaded_file = st.file_uploader("Arraste ou selecione seu PDF aqui", type=["pdf"])
 
-tab_prod, tab_arena = st.tabs(["🚀 Conversor (Produção)", "⚔️ Arena de Benchmark"])
-
-with tab_prod:
-    if uploaded_file is not None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            temp_dir_path = Path(temp_dir)
+if uploaded_file is not None:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_dir_path = Path(temp_dir)
+        
+        file_path = temp_dir_path / uploaded_file.name
+        output_dir = temp_dir_path / "output"
+        output_dir.mkdir(exist_ok=True)
+        
+        # Salvando arquivo enviado
+        with open(file_path, "wb") as f:
+            f.write(uploaded_file.getbuffer())
+        
+        start_time = time.time()
+        with st.spinner("⏳ O Comitê de Especialistas v2 está analisando seu documento... (Radar, Narrativa, Tabelas, Visão e Juiz Mestre em execução)"):
+            # Agora process_pdf retorna um OrchestratorResult
+            result = process_pdf(file_path)
+                
+        duration = time.time() - start_time
             
-            file_path = temp_dir_path / uploaded_file.name
-            output_dir = temp_dir_path / "output"
-            output_dir.mkdir(exist_ok=True)
+        if result.success:
+            md_content = result.final_markdown
+            md_path = output_dir / (uploaded_file.name.replace(".pdf", "") + ".md")
             
-            # Salvando arquivo enviado
-            with open(file_path, "wb") as f:
-                f.write(uploaded_file.getbuffer())
-            
-            start_time = time.time()
-            with st.spinner("⏳ O Comitê de Especialistas v2 está analisando seu documento... (Radar, Narrativa, Tabelas, Visão e Juiz Mestre em execução)"):
-                # Agora process_pdf retorna um OrchestratorResult
-                result = process_pdf(file_path)
-                    
-            duration = time.time() - start_time
+            with open(md_path, "w", encoding="utf-8") as f:
+                f.write(md_content)
                 
-            if result.success:
-                md_content = result.final_markdown
-                md_path = output_dir / (uploaded_file.name.replace(".pdf", "") + ".md")
+            if md_path.exists():
+                stats = result.stats
+                score_orquestrador = result.mdeval_score
                 
-                with open(md_path, "w", encoding="utf-8") as f:
-                    f.write(md_content)
-                    
-                if md_path.exists():
-                    stats = result.stats
-                    score = result.mdeval_score
-                    
-                    st.success(f"Concluído em **{duration:.2f}s**! ✨ Orquestração finalizada com sucesso.")
-                    
-                    # Layout de colunas para métricas (Visão Quantitativa + Qualitativa)
-                    m1, m2, m3, m4 = st.columns(4)
-                    
-                    # Resumo Estatístico Requisitado pelo Usuário
-                    m1.metric("Páginas Lidas", stats.get("total_pages", 0), help="Extensão detectada pelo Radar Espacial.")
-                    m2.metric("Caracteres (Volume)", f"{len(md_content):,}", help="Volume bruto final do Markdown convertido.")
-                    m3.metric("Tabelas/Imagens", f'{stats.get("tables_injected", 0)} / {stats.get("visual_blocks", 0)}', help="Matrizes e Fragmentos visuais consolidados.")
-                    m4.metric("Saúde Estrutural", f"{score:.0f}%", help="Validação MDEval pelo Juiz Mestre (percentual de tags).")
-
-                    st.info(f"🏆 **Motores Vencedores (Comitê):** Narrativa: `{stats.get('narrative_winner', 'N/A')}` | Matrizes: `{stats.get('data_winner', 'N/A')}` | Visão: `{stats.get('vision_winner', 'N/A')}`")
-
-                    st.divider()
-                    
-                    col1, col2 = st.columns(2)
-                    
-                    with col1:
-                        st.subheader("👀 Renderizado (Preview)")
-                        with st.container(height=500, border=True):
-                            st.markdown(md_content)
-                    
-                    with col2:
-                        st.subheader("📝 Código Markdown")
-                        with st.container(height=500, border=True):
-                            st.code(md_content, language="markdown")
-                    
-                    # Download button
-                    st.download_button(
-                        label="Baixar Markdown Limpo 📥",
-                        data=md_content,
-                        file_name=md_path.name,
-                        mime="text/markdown",
-                        use_container_width=True,
-                        type="primary"
-                    )
-                else:
-                    st.error("Erro interno: o arquivo MD não foi salvo no servidor.")
-            else:
-                st.error(f"Erro Crítico do Orquestrador: {result.error}")
-    else:
-        # Boas vindas/Placeholder
-        st.info("Aguardando upload do PDF para aplicar o motor Ensemble... 🚀")
-        st.image("https://img.icons8.com/clouds/200/000000/pdf.png")
-
-with tab_arena:
-    st.subheader("Batalha de Ferramentas (Comparação)")
-    
-    st.markdown("""
-    Esta arena testa o seu PDF nos motores isolados e em nosso **Comitê V2**, exibindo qual ferramenta lida melhor com o desafio.
-    """)
-    
-    # Removeremos o uploader separado e usaremos o global
-    if uploaded_file is not None:
-        if st.button("🥊 Iniciar Batalha de Benchmark neste Documento", type="primary"):
-            from src.metrics.eval_metrics import StructuralDensityEvaluator
-            from src.specialists.narrative_markitdown import extract_narrative_markitdown
-            from src.specialists.narrative_pymupdf import extract_narrative_pymupdf
-            import pandas as pd
-            
-            # Wrappers das IAs pesadas
-            def run_docling(p):
-                try:
-                    from docling.document_converter import DocumentConverter
-                    return DocumentConverter().convert(str(p)).document.export_to_markdown()
-                except: return None
-
-            def run_marker(p):
-                try:
-                    from marker.convert import convert_single_pdf
-                    from marker.models import load_all_models
-                    full_text, _, _ = convert_single_pdf(str(p), load_all_models())
-                    return full_text if full_text else None
-                except: return None
-
-            evaluator = StructuralDensityEvaluator()
-            
-            with tempfile.TemporaryDirectory() as temp_dir:
-                file_path = Path(temp_dir) / uploaded_file.name
-                with open(file_path, "wb") as f:
-                    f.write(uploaded_file.getbuffer())
-                    
-                resultados = []
+                # --- SEÇÃO 1: O MELHOR RESULTADO ---
+                st.subheader("1. Seu Markdown Otimizado (Resultado Final) 🏆")
+                st.success(f"Conversão concluída em **{duration:.2f}s** com o Comitê V2!")
                 
-                with st.spinner("⚔️ Roda 1/5: MarkItDown isolado..."):
-                    t0 = time.time()
-                    md1 = extract_narrative_markitdown(file_path)
-                    resultados.append({"Motor": "MarkItDown (Microsoft)", "Tempo (s)": time.time()-t0, "Saúde Estrutural (%)": evaluator.evaluate(md1)})
-
-                with st.spinner("⚔️ Roda 2/5: PyMuPDF4LLM isolado..."):
-                    t0 = time.time()
-                    md2 = extract_narrative_pymupdf(file_path)
-                    resultados.append({"Motor": "PyMuPDF4LLM", "Tempo (s)": time.time()-t0, "Saúde Estrutural (%)": evaluator.evaluate(md2)})
+                # Download button no topo para facilidade
+                st.download_button(
+                    label="Baixar Markdown RAG-Ready 📥",
+                    data=md_content,
+                    file_name=md_path.name,
+                    mime="text/markdown",
+                    use_container_width=True,
+                    type="primary"
+                )
                 
-                with st.spinner("⚔️ Roda 3/5: Docling (IA) isolado..."):
-                    t0 = time.time()
-                    md3 = run_docling(file_path)
-                    if md3 is not None:
-                        resultados.append({"Motor": "Docling (IBM)", "Tempo (s)": time.time()-t0, "Saúde Estrutural (%)": evaluator.evaluate(md3)})
-                    
-                with st.spinner("⚔️ Roda 4/5: Marker-PDF (IA) isolado..."):
-                    t0 = time.time()
-                    md4 = run_marker(file_path)
-                    if md4 is not None:
-                        resultados.append({"Motor": "Marker-PDF", "Tempo (s)": time.time()-t0, "Saúde Estrutural (%)": evaluator.evaluate(md4)})
-
-                with st.spinner("🛡️ Roda 5/5: Comitê de Especialistas V2 (Orquestrador)"):
-                    t0 = time.time()
-                    res = process_pdf(file_path)
-                    t_final = time.time()-t0
-                    sc_final = res.mdeval_score if res.success else 0.0
-                    resultados.append({"Motor": "👑 Comitê V2 (Orquestrado)", "Tempo (s)": t_final, "Saúde Estrutural (%)": sc_final})
-                
-                st.success("Batalha Finalizada!")
-                
-                df = pd.DataFrame(resultados)
-                
-                # Exibição da Tabela de 2 Colunas exigida pelo usuário
-                df_display = pd.DataFrame({
-                    "Ferramenta": [r["Motor"] for r in resultados],
-                    "Porcentagem (Resultado)": [f"{r['Saúde Estrutural (%)']:.1f}%" for r in resultados]
-                })
-                
-                st.markdown("### Resultado Final")
-                st.table(df_display)
-
-                st.divider()
-                
-                # Mantemos os gráficos visuais abaixo para quem quiser ver os detalhes matemáticos
-                st.markdown("#### Métricas Avançadas")
                 col1, col2 = st.columns(2)
                 with col1:
-                    st.write("**Desempenho (Score MDEval - Maior é melhor)**")
-                    st.bar_chart(df.set_index("Motor")["Saúde Estrutural (%)"], color="#2ecc71")
-                
+                    st.markdown("**👀 Renderizado (Preview)**")
+                    with st.container(height=400, border=True):
+                        st.markdown(md_content)
                 with col2:
-                    st.write("**Custo Computacional (Segundos - Menor é melhor)**")
-                    st.bar_chart(df.set_index("Motor")["Tempo (s)"], color="#e74c3c")
+                    st.markdown("**📝 Código Fonte (Markdown)**")
+                    with st.container(height=400, border=True):
+                        st.code(md_content, language="markdown")
+                        
+                st.divider()
+                
+                # --- SEÇÃO 2: OS BASTIDORES (BENCHMARK) ---
+                st.subheader("2. Os Bastidores: Por que este é o melhor resultado? 📊")
+                st.markdown("""
+                Nos bastidores, nosso **Orquestrador V2** executa múltiplas bibliotecas e aplica Heurísticas Brasileiras de Limpeza para evitar a poluição de Bancos Vetoriais (RAG).
+                Abaixo, testamos o seu documento agora mesmo nas bibliotecas puras (cruas) e compararmos a **Saúde Estrutural (MDEval)** delas com a nossa.
+                """)
+                
+                if st.button("🥊 Executar Comparação (Benchmark) neste Documento", type="secondary"):
+                    from src.metrics.eval_metrics import StructuralDensityEvaluator
+                    from src.specialists.narrative_markitdown import extract_narrative_markitdown
+                    from src.specialists.narrative_pymupdf import extract_narrative_pymupdf
+                    from src.metrics.rag_readiness_linter import RagReadinessLinter
+                    import pandas as pd
                     
-    st.divider()
-    st.markdown("### Dicionário de Ferramentas")
-    st.markdown("Nosso arsenal atual engloba 8 ferramentas independentes sendo orquestradas:")
-    st.markdown("""
-    | Ferramenta | Etapa | Papel na aplicação |
-    |---|---|---|
-    | **unstructured** | Radar (0) | Identifica as coordenadas e delimita zonas (tabelas, parágrafos, imagens) para roteamento inteligente. |
-    | **MarkItDown** | Narrativa (1) | Reconstrói o fluxo de texto primário preservando a semântica de cabeçalhos. |
-    | **pymupdf4llm** | Narrativa (1) | Scanner secundário para garantir cobertura completa do texto e tapar buracos do primário. |
-    | **docling** | Tabelas (2) | IA primária para semântica de matrizes complexas, células mescladas e ordem de dados. |
-    | **pdfplumber** | Tabelas (2) | Validador geométrico secundário para garantir coordenadas matemáticas rígidas de caixas. |
-    | **marker-pdf** | Visão (3) | IA pesada para transformar imagens escaneadas profundas em Markdown estruturado. |
-    | **pytesseract** | Visão (3) | Contingência OCR secundária ultra-rápida (para impedir sobrecarga de VRAM). |
-    | **MDEval** | Validação (4)| Auditor final matemático que converte e compara as tags estruturais injetadas. |
-    """)
+                    evaluator = StructuralDensityEvaluator()
+                    linter = RagReadinessLinter()
+                    
+                    def build_metrics(motor, md_text, build_time):
+                        eval_sc = evaluator.evaluate(md_text)
+                        linter_sc = linter.evaluate(md_text)
+                        
+                        ocr = linter_sc["Orphan_Chunk_Rate"] * 100
+                        twr = max(0, 100 - (max(0, linter_sc["Token_Word_Ratio"] - 1.5) * 40))
+                        ast = max(0, 100 - (linter_sc["AST_Violations"] * 20))
+                        fmt = 100 if linter_sc["Frontmatter_Invalidity"] == 0.0 else 0
+                        
+                        # Score Global RAG (100 pts)
+                        score = (eval_sc * 0.40) + ((100 - ocr) * 0.30) + (twr * 0.15) + (ast * 0.10) + (fmt * 0.05)
+                        
+                        return {
+                            "Motor": motor,
+                            "Tempo (s)": build_time,
+                            "SCORE RAG": score,
+                            "MDE": eval_sc,
+                            "OCR": ocr,
+                            "TWR": linter_sc["Token_Word_Ratio"],
+                            "AST": linter_sc["AST_Violations"],
+                            "FMT": "❌" if linter_sc["Frontmatter_Invalidity"] else "✅"
+                        }
+
+                    resultados = []
+                    
+                    with st.spinner("⚔️ Roda 1/2: Testando MarkItDown isolado..."):
+                        t0 = time.time()
+                        md1 = extract_narrative_markitdown(file_path)
+                        resultados.append(build_metrics("MarkItDown (puro)", md1, time.time() - t0))
+
+                    with st.spinner("⚔️ Roda 2/2: Testando PyMuPDF4LLM isolado..."):
+                        t0 = time.time()
+                        md2 = extract_narrative_pymupdf(file_path)
+                        resultados.append(build_metrics("PyMuPDF4LLM (puro)", md2, time.time() - t0))
+                    
+                    with st.spinner("🛡️ Construindo métricas do Orquestrador..."):
+                        # Reaproveitamos o md e a duração
+                        resultados.append(build_metrics("👑 Nosso Orquestrador V2", md_content, duration))
+                    
+                    df = pd.DataFrame(resultados)
+                    
+                    st.info("""**Qual é o diferencial dessa aplicação na prática?**  
+                    Enquanto bibliotecas "cruas" focam apenas em copiar as palavras do documento, nosso Sistema atua como Engenheiro de Dados RAG. Nós computamos 5 variáveis MLOps simultâneas (avaliando Poluição Visual, Custo de Token da LLM e Estrutura Lógica) para gerar o **Score RAG Global de Prontidão**. Veja o detalhamento na tabela abaixo.
+                    """)
+
+                    # Tabela Simples
+                    df_display = pd.DataFrame({
+                        "Abordagem": [r["Motor"] for r in resultados],
+                        "SCORE RAG": [f"🏆 {r['SCORE RAG']:.1f}" for r in resultados],
+                        "MDE (%)": [f"{r['MDE']:.1f}%" for r in resultados],
+                        "OCR (%)": [f"{r['OCR']:.1f}%" for r in resultados],
+                        "TWR": [f"{r['TWR']:.2f}" for r in resultados],
+                        "AST": [f"{r['AST']}" for r in resultados],
+                        "FMT": [r["FMT"] for r in resultados]
+                    })
+                    st.table(df_display)
+                    
+                    st.caption("""
+                    **📚 Legenda de Qualidade RAG:**  
+                    **SCORE RAG:** Pontuação Final de Grau de Prontidão para Agentes LLM (0-100). Combinação ponderada das variáveis abaixo.  
+                    **MDE (Densidade MDEval):** Estrutura da formatação visual (Tabelas e marcações sem lixo OCR). (Peso 40%).  
+                    **OCR (Orphan Chunks):** Taxa de fragmentação vazando sem Metadados Hierárquicos. Ideal = 0%. (Peso 30%).  
+                    **TWR (Token/Word):** Eficiência de Espaço Latente (quantos Tokens a IA gasta por Palavra real). Ideal é ~1.0 a 1.5. (Peso 15%).  
+                    **AST (Violações de Árvore):** Saltos Ilógicos de títulos (H1 para H3) ou poluição via HTML Embutido inútil. (Peso 10%).  
+                    **FMT (Frontmatter YAML):** Presença de metadados rígidos de roteamento no cabeçalho do arquivo global. (Peso 5%).
+                    """)
+                    
+                    # Gráficos Didáticos
+                    st.markdown("#### Matriz Visual de Impacto")
+                    g1, g2, g3 = st.columns(3)
+                    with g1:
+                        st.markdown("**Pontuação SCORE RAG (0-100🏆)**")
+                        st.bar_chart(df.set_index("Motor")["SCORE RAG"], color="#f1c40f")
+                        st.caption("Visão Holística. O vencedor garante sucesso no Vector DB.")
+                    
+                    with g2:
+                        st.markdown("**MDEval: Estrutura Visual (%)**")
+                        st.bar_chart(df.set_index("Motor")["MDE"], color="#2ecc71")
+                        st.caption("Capacidade de preservar matrizes sem vazar rodapés lixo.")
+
+                    with g3:
+                        st.markdown("**Custo Computacional (s)**")
+                        st.bar_chart(df.set_index("Motor")["Tempo (s)"], color="#e74c3c")
+                        st.caption("Esforço gasto unindo Heurísticas para o melhor arquivo.")
+                        
+                st.divider()
+                
+                # --- SEÇÃO 3: DICIONÁRIO DE FERRAMENTAS LITE ---
+                st.subheader("🛠️ Dicionário de Ferramentas (Stack Lite)")
+                st.markdown("Nosso arsenal da versão *Padrão (Lite)* engloba 6 ferramentas independentes core:")
+                st.markdown("""
+                | Ferramenta | Etapa | Papel na aplicação |
+                |---|---|---|
+                | **unstructured** | Radar (0) | Identifica as coordenadas e mapeia páginas vazias/poluídas. |
+                | **MarkItDown** | Narrativa (1) | Reconstrói o fluxo de texto primário preservando a semântica de cabeçalhos. |
+                | **pymupdf4llm** | Narrativa (1) | Scanner secundário para garantir cobertura completa do texto e tapar buracos do primário. |
+                | **pdfplumber** | Tabelas (2) | Validador geométrico secundário para garantir matrizes lógicas em HTML. |
+                | **MDEval** | Validação (4)| Auditor final matemático que converte e nota tags estruturais injetadas. |
+                | **RagLinter** | RAG (5)| Módulo Analítico Heurístico que remove *Orphan Chunks* e injeta Root-YAMLs. |
+                """)
+            else:
+                st.error("Erro interno: o arquivo MD não foi salvo no servidor.")
+        else:
+            st.error(f"Erro Crítico do Orquestrador: {result.error}")
+else:
+    # Boas vindas/Placeholder
+    st.info("Faça o upload do PDF acima para aplicar o motor Ensemble e transformar o lixo em Dados! 🚀")
+    st.image("https://img.icons8.com/clouds/200/000000/pdf.png")
 

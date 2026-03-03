@@ -3,9 +3,8 @@ from pathlib import Path
 from markitdown import MarkItDown
 import pymupdf4llm
 from src.orchestrator import process_pdf
-from src.metrics.eval_metrics import StructuralDensityEvaluator
 
-pdf_path = Path("tests/corpus/Como elaborar um recurso administrativo contra a decisão da comissão de heteroidentificação - Guia atualizado 2025.pdf")
+pdf_path = Path("tests/corpus/Convocacao_entrevista_banca_heteroidentificacao_IA_aplicada_Dados_Corporativos.pdf")
 
 # 1. MarkItDown Pure
 try:
@@ -30,12 +29,4 @@ res_orch = process_pdf(pdf_path)
 with open("test_orchestrator.md", "w") as f:
     f.write(res_orch.final_markdown)
 
-# Extrair as tags
-evaluator = StructuralDensityEvaluator()
-print(f"MarkItDown MDEval: {evaluator.evaluate(m_text)}%")
-print(f"PyMuPDF MDEval: {evaluator.evaluate(p_text)}%")
-print(f"Orchestrator MDEval: {evaluator.evaluate(res_orch.final_markdown)}%")
-print(f"\n--- Orchestrator Analytics ---")
-print(f"Páginas lidas: {res_orch.metadata.total_pages}")
-print(f"Tabelas identificadas e tratadas: {res_orch.metadata.tables_count}")
-print("Done. Files exported: test_markitdown.md, test_pymupdf.md, test_orchestrator.md")
+print("Exported markdowns for reference.")

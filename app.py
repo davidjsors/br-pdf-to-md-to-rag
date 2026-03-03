@@ -124,20 +124,6 @@ with tab_arena:
     
     st.markdown("""
     Esta arena testa o seu PDF nos motores isolados e em nosso **Comitê V2**, exibindo qual ferramenta lida melhor com o desafio.
-    Nosso arsenal atual engloba 8 ferramentas independentes sendo orquestradas:
-    """)
-    
-    st.markdown("""
-    | Ferramenta | Etapa | Papel na aplicação |
-    |---|---|---|
-    | **unstructured** | Radar (0) | Identifica as coordenadas e delimita zonas (tabelas, parágrafos, imagens) para roteamento inteligente. |
-    | **MarkItDown** | Narrativa (1) | Reconstrói o fluxo de texto primário preservando a semântica de cabeçalhos. |
-    | **pymupdf4llm** | Narrativa (1) | Scanner secundário para garantir cobertura completa do texto e tapar buracos do primário. |
-    | **docling** | Tabelas (2) | IA primária para semântica de matrizes complexas, células mescladas e ordem de dados. |
-    | **pdfplumber** | Tabelas (2) | Validador geométrico secundário para garantir coordenadas matemáticas rígidas de caixas. |
-    | **marker-pdf** | Visão (3) | IA pesada para transformar imagens escaneadas profundas em Markdown estruturado. |
-    | **pytesseract** | Visão (3) | Contingência OCR secundária ultra-rápida (para impedir sobrecarga de VRAM). |
-    | **MDEval** | Validação (4)| Auditor final matemático que converte e compara as tags estruturais injetadas. |
     """)
     
     # Removeremos o uploader separado e usaremos o global
@@ -153,15 +139,15 @@ with tab_arena:
                 try:
                     from docling.document_converter import DocumentConverter
                     return DocumentConverter().convert(str(p)).document.export_to_markdown()
-                except: return ""
+                except: return None
 
             def run_marker(p):
                 try:
                     from marker.convert import convert_single_pdf
                     from marker.models import load_all_models
                     full_text, _, _ = convert_single_pdf(str(p), load_all_models())
-                    return full_text if full_text else ""
-                except: return ""
+                    return full_text if full_text else None
+                except: return None
 
             evaluator = StructuralDensityEvaluator()
             
@@ -185,12 +171,14 @@ with tab_arena:
                 with st.spinner("⚔️ Roda 3/5: Docling (IA) isolado..."):
                     t0 = time.time()
                     md3 = run_docling(file_path)
-                    resultados.append({"Motor": "Docling (IBM)", "Tempo (s)": time.time()-t0, "Saúde Estrutural (%)": evaluator.evaluate(md3)})
+                    if md3 is not None:
+                        resultados.append({"Motor": "Docling (IBM)", "Tempo (s)": time.time()-t0, "Saúde Estrutural (%)": evaluator.evaluate(md3)})
                     
                 with st.spinner("⚔️ Roda 4/5: Marker-PDF (IA) isolado..."):
                     t0 = time.time()
                     md4 = run_marker(file_path)
-                    resultados.append({"Motor": "Marker-PDF", "Tempo (s)": time.time()-t0, "Saúde Estrutural (%)": evaluator.evaluate(md4)})
+                    if md4 is not None:
+                        resultados.append({"Motor": "Marker-PDF", "Tempo (s)": time.time()-t0, "Saúde Estrutural (%)": evaluator.evaluate(md4)})
 
                 with st.spinner("🛡️ Roda 5/5: Comitê de Especialistas V2 (Orquestrador)"):
                     t0 = time.time()
@@ -203,6 +191,19 @@ with tab_arena:
                 
                 df = pd.DataFrame(resultados)
                 
+                # Exibição da Tabela de 2 Colunas exigida pelo usuário
+                df_display = pd.DataFrame({
+                    "Ferramenta": [r["Motor"] for r in resultados],
+                    "Porcentagem (Resultado)": [f"{r['Saúde Estrutural (%)']:.1f}%" for r in resultados]
+                })
+                
+                st.markdown("### Resultado Final")
+                st.table(df_display)
+
+                st.divider()
+                
+                # Mantemos os gráficos visuais abaixo para quem quiser ver os detalhes matemáticos
+                st.markdown("#### Métricas Avançadas")
                 col1, col2 = st.columns(2)
                 with col1:
                     st.write("**Desempenho (Score MDEval - Maior é melhor)**")
@@ -211,6 +212,20 @@ with tab_arena:
                 with col2:
                     st.write("**Custo Computacional (Segundos - Menor é melhor)**")
                     st.bar_chart(df.set_index("Motor")["Tempo (s)"], color="#e74c3c")
-                
-                st.dataframe(df.style.highlight_max(subset=["Saúde Estrutural (%)"], color='lightgreen').highlight_min(subset=["Tempo (s)"], color='lightgreen'), use_container_width=True)
+                    
+    st.divider()
+    st.markdown("### Dicionário de Ferramentas")
+    st.markdown("Nosso arsenal atual engloba 8 ferramentas independentes sendo orquestradas:")
+    st.markdown("""
+    | Ferramenta | Etapa | Papel na aplicação |
+    |---|---|---|
+    | **unstructured** | Radar (0) | Identifica as coordenadas e delimita zonas (tabelas, parágrafos, imagens) para roteamento inteligente. |
+    | **MarkItDown** | Narrativa (1) | Reconstrói o fluxo de texto primário preservando a semântica de cabeçalhos. |
+    | **pymupdf4llm** | Narrativa (1) | Scanner secundário para garantir cobertura completa do texto e tapar buracos do primário. |
+    | **docling** | Tabelas (2) | IA primária para semântica de matrizes complexas, células mescladas e ordem de dados. |
+    | **pdfplumber** | Tabelas (2) | Validador geométrico secundário para garantir coordenadas matemáticas rígidas de caixas. |
+    | **marker-pdf** | Visão (3) | IA pesada para transformar imagens escaneadas profundas em Markdown estruturado. |
+    | **pytesseract** | Visão (3) | Contingência OCR secundária ultra-rápida (para impedir sobrecarga de VRAM). |
+    | **MDEval** | Validação (4)| Auditor final matemático que converte e compara as tags estruturais injetadas. |
+    """)
 

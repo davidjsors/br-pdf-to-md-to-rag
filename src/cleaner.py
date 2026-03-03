@@ -38,9 +38,17 @@ def clean_text_block(text: str) -> str:
     
     # 7. Remove espaços duplos e resíduos
     text = re.sub(r' +', ' ', text)
+
+    # 7a. Normaliza quebras de linha excessivas (Máximo 2 consecutivas para separar parágrafos)
+    text = re.sub(r'\n{3,}', '\n\n', text)
     
     # 8. Limpeza final de pontuação repetida (ruído de extração)
     text = re.sub(r'([\.?!,;])\1+', r'\1', text)
+
+    # 8a. Remove cabeçalhos repetidos de impressão web (ex: "2/27/26, 10:54 AM Inscrição...")
+    # Captura datas comuns e títulos que se repetem em blocos
+    header_pattern = r'\d{1,2}/\d{1,2}/\d{2,4},?\s+\d{1,2}:\d{2}\s*(?:AM|PM)?\s+.*'
+    text = re.sub(header_pattern, '', text, flags=re.IGNORECASE)
     
     # 9. Injetar Headers em documentos "flat" (Heurística de Prontidão RAG)
     # Promove linhas ALL CAPS isoladas (10 a 120 caracteres) para H2

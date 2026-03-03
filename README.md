@@ -34,7 +34,7 @@ O projeto utiliza uma pipeline de extração orquestrada em etapas sequenciais, 
 ## Avaliador de Saúde Estrutural (MDEval)
 
 O diferencial técnico deste projeto é o sistema de avaliação da qualidade do Markdown gerado, implementado em `src/metrics/eval_metrics.py`. Inspirado no paper __ 
-[![MDEval: Evaluating Markdown Awareness of Large Language Models](https://doi.org/10.48550/arXiv.2501.15000)](https://doi.org/10.48550/arXiv.2501.15000):
+[MDEval: Evaluating Markdown Awareness of Large Language Models](https://doi.org/10.48550/arXiv.2501.15000):
 
 1. **HTMLifying:** O Markdown é renderizado como HTML temporário para separar o conteúdo textual do esqueleto estrutural (`<table>`, `<h1>`, `<ul>`).
 2. **Pesos por Relevância RAG:** Tags de dados estruturados (`table`, `tr`, `td`) recebem peso 25. Listas (`ul`, `li`) recebem peso 10. Títulos (`h1`-`h6`) recebem peso 5. Tags de formatação (`b`, `i`, `strong`) recebem peso 1.

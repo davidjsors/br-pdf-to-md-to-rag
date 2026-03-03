@@ -101,19 +101,41 @@ if uploaded_file is not None:
                         
                         # Botões minimalistas injetados via HTML para controle total de estilo
                         md_b64 = base64.b64encode(md_content.encode()).decode()
+                        # Escapando o conteúdo para JS
+                        js_safe_content = md_content.replace('\\', '\\\\').replace('`', '\\`').replace('$', '\\$')
+                        
                         actions_html = f"""
-                        <div style="display: flex; justify-content: flex-end; gap: 10px; padding-top: 5px;">
-                            <button onclick="navigator.clipboard.writeText(`{md_content.replace('`', '\\`').replace('$', '\\$')}`)" 
+                        <div style="display: flex; justify-content: flex-end; gap: 10px; padding-top: 5px; font-family: sans-serif;">
+                            <button id="copyBtn" onclick="copyToClipboard()" 
                                     title="Copiar Markdown"
-                                    style="background: #262730; border: 1px solid #444; border-radius: 4px; cursor: pointer; padding: 4px 8px; color: #fafafa; font-size: 16px; transition: 0.3s;">
+                                    style="background: #262730; border: 1px solid #444; border-radius: 4px; cursor: pointer; padding: 4px 8px; color: #fafafa; font-size: 16px; transition: 0.3s; width: 35px;">
                                 📋
                             </button>
                             <a href="data:text/markdown;base64,{md_b64}" download="{md_path.name}" 
                                title="Baixar Markdown"
-                               style="background: #262730; border: 1px solid #444; border-radius: 4px; cursor: pointer; padding: 4px 8px; color: #fafafa; font-size: 16px; text-decoration: none; display: flex; align-items: center; transition: 0.3s;">
+                               style="background: #262730; border: 1px solid #444; border-radius: 4px; cursor: pointer; padding: 4px 8px; color: #fafafa; font-size: 16px; text-decoration: none; display: flex; align-items: center; justify-content: center; transition: 0.3s; width: 35px;">
                                 📥
                             </a>
                         </div>
+                        <script>
+                        function copyToClipboard() {{
+                            const text = `{js_safe_content}`;
+                            const textArea = document.createElement("textarea");
+                            textArea.value = text;
+                            document.body.appendChild(textArea);
+                            textArea.select();
+                            try {{
+                                document.execCommand('copy');
+                                const btn = document.getElementById('copyBtn');
+                                btn.innerText = '✅';
+                                setTimeout(() => {{ btn.innerText = '📋'; }}, 2000);
+                            }} catch (err) {{
+                                console.error('Erro ao copiar: ', err);
+                                alert('Erro ao copiar para o clipboard');
+                            }}
+                            document.body.removeChild(textArea);
+                        }}
+                        </script>
                         """
                         with a_col:
                             st.components.v1.html(actions_html, height=45)

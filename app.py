@@ -105,16 +105,17 @@ if uploaded_file is not None:
                         js_safe_content = md_content.replace('\\', '\\\\').replace('`', '\\`').replace('$', '\\$')
                         
                         actions_html = f"""
-                        <div style="display: flex; justify-content: flex-end; gap: 10px; padding-top: 5px; font-family: sans-serif;">
+                        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+                        <div style="display: flex; justify-content: flex-end; gap: 12px; padding-top: 5px; font-family: sans-serif;">
                             <button id="copyBtn" onclick="copyToClipboard()" 
                                     title="Copiar Markdown"
-                                    style="background: #262730; border: 1px solid #444; border-radius: 4px; cursor: pointer; padding: 4px 8px; color: #fafafa; font-size: 16px; transition: 0.3s; width: 35px;">
-                                📋
+                                    style="background: transparent; border: 1px solid #444; border-radius: 4px; cursor: pointer; padding: 6px 10px; color: #ffffff; font-size: 14px; transition: 0.2s; display: flex; align-items: center; justify-content: center; width: 38px; height: 32px;">
+                                <i id="copyIcon" class="fa-regular fa-copy"></i>
                             </button>
                             <a href="data:text/markdown;base64,{md_b64}" download="{md_path.name}" 
                                title="Baixar Markdown"
-                               style="background: #262730; border: 1px solid #444; border-radius: 4px; cursor: pointer; padding: 4px 8px; color: #fafafa; font-size: 16px; text-decoration: none; display: flex; align-items: center; justify-content: center; transition: 0.3s; width: 35px;">
-                                📥
+                               style="background: transparent; border: 1px solid #444; border-radius: 4px; cursor: pointer; padding: 6px 10px; color: #ffffff; font-size: 14px; text-decoration: none; display: flex; align-items: center; justify-content: center; transition: 0.2s; width: 38px; height: 32px;">
+                                <i class="fa-solid fa-download"></i>
                             </a>
                         </div>
                         <script>
@@ -126,12 +127,18 @@ if uploaded_file is not None:
                             textArea.select();
                             try {{
                                 document.execCommand('copy');
+                                const icon = document.getElementById('copyIcon');
                                 const btn = document.getElementById('copyBtn');
-                                btn.innerText = '✅';
-                                setTimeout(() => {{ btn.innerText = '📋'; }}, 2000);
+                                icon.className = 'fa-solid fa-check';
+                                btn.style.borderColor = '#2ecc71';
+                                icon.style.color = '#2ecc71';
+                                setTimeout(() => {{ 
+                                    icon.className = 'fa-regular fa-copy'; 
+                                    btn.style.borderColor = '#444';
+                                    icon.style.color = '#ffffff';
+                                }}, 2000);
                             }} catch (err) {{
                                 console.error('Erro ao copiar: ', err);
-                                alert('Erro ao copiar para o clipboard');
                             }}
                             document.body.removeChild(textArea);
                         }}

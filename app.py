@@ -94,16 +94,21 @@ if uploaded_file is not None:
                         body_content = md_content
 
                     with col1:
-                        # Toolbar ultra-compacta
-                        h1, h2 = st.columns([0.9, 0.1])
-                        h1.markdown("**📝 Código Fonte (Markdown)**")
-                        h2.download_button(
+                        # Toolbar de Ações Customizada (Minimalista)
+                        t_col, b_col1, b_col2 = st.columns([0.7, 0.1, 0.1])
+                        t_col.markdown("**📝 Código Fonte**")
+                        
+                        # Botões de Ícone Compactos
+                        # Nota: st.code já tem um botão de cópia nativo, mas colocamos este por redundância estética
+                        b_col1.button("📋", help="Cópia rápida disponível no bloco", disabled=True)
+                        b_col2.download_button(
                             label="📥",
                             data=md_content,
                             file_name=md_path.name,
                             mime="text/markdown",
-                            help="Baixar Markdown",
+                            help="Baixar Markdown RAG-Ready",
                         )
+                        
                         with st.container(height=500, border=True):
                             st.code(md_content, language="markdown")
                     with col2:

@@ -32,6 +32,24 @@ Aqui processamos o texto corrido! Invocamos 2 extratores simultaneamente (concor
 2. **PyMuPDF4LLM:** Garante que notas de rodapé essenciais não foram omitidas.
 - **O que ele faz:** Ele conta os caracteres gerados pelas duas ferramentas. Se o volume for igual, vence o MarkItDown. Ele então pega esse molde de texto "Vencedor" e usa o GPS do passo anterior para abrir "buracos" (Âncoras de HTML `<!-- TABLE_ANCHOR_p3_t1 -->`) em todas os locais que ele sabe que havia uma tabela complexa. 
 
+## 🏗️ Arquitetura Final: Smart-Lite Ensemble
+
+A pipeline agora opera sob um regime de **Decisão Hierárquica por Saúde (MDEval)** em vez de volume ou prioridade fixa.
+
+```mermaid
+graph TD
+    A[PDF Upload < 1MB] --> B[Radar: Unstructured + pdfplumber]
+    B --> C[Stage 1: Comitê Narrativo]
+    C --> D{MDEval Judge}
+    D -- 99% MDE --> E[PyMuPDF4LLM]
+    D -- Alternativo --> F[MarkItDown]
+    E --> G[Stage 2: Juiz de Dados]
+    F --> G
+    G --> H[Synthesizer: Master Judge]
+    H --> I[Frontmatter YAML + Header Anchoring]
+    I --> J[Markdown RAG-Ready]
+```
+
 ### Passo 4: Etapa 2 - O Juiz de Tabelas (`src/judges/data_judge.py`)
 *(Só é acionado se a Fase 0 detectou blocos tabulares).*
 Tabelas são destruídas por OCR genérico. Então, despachamos o serviço de alta precisão:

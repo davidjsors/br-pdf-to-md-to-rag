@@ -25,7 +25,7 @@ O projeto utiliza uma pipeline de extração orquestrada em etapas sequenciais, 
 | 0. Radar Espacial | `spatial_scanner` | `unstructured`, `pdfplumber` | Classifica as zonas de cada página (texto, tabela, imagem) e constrói o manifesto do documento. |
 | 1. Fundação Narrativa | `narrative_judge` | `MarkItDown`, `PyMuPDF4LLM` | Extrai o fluxo textual primário. Avalia a saúde estrutural de ambos os motores via MDEval e seleciona o resultado com melhor pontuação. |
 | 2. Extração de Dados | `data_judge` | `pdfplumber` | Extrai tabelas com precisão geométrica das páginas sinalizadas pelo Radar. |
-| 3. Síntese e Validação | `master_judge` | Heurísticas customizadas | Funde tabelas no esqueleto narrativo, aplica filtros morfológicos PT-BR e injeta metadados YAML (frontmatter). |
+| 3. Síntese e Validação | `master_judge` | Heurísticas customizadas | Funde tabelas no esqueleto narrativo, aplica filtros morfológicos e injeta metadados YAML (frontmatter). |
 
 > Documentação técnica detalhada em [docs/pipeline_architecture_v2.md](docs/pipeline_architecture_v2.md).
 
@@ -33,8 +33,8 @@ O projeto utiliza uma pipeline de extração orquestrada em etapas sequenciais, 
 
 ## Avaliador de Saúde Estrutural (MDEval)
 
-O diferencial técnico deste projeto é o sistema de avaliação da qualidade do Markdown gerado, implementado em `src/metrics/eval_metrics.py`. Inspirado no paper __ 
-[MDEval: Evaluating Markdown Awareness of Large Language Models](https://doi.org/10.48550/arXiv.2501.15000):
+O diferencial técnico deste projeto é o sistema de avaliação da qualidade do Markdown gerado, implementado em `src/metrics/eval_metrics.py`. Inspirado no paper
+[MDEval: Evaluating Markdown Awareness of Large Language Models](https://doi.org/10.48550/arXiv.2501.15000)
 
 1. **HTMLifying:** O Markdown é renderizado como HTML temporário para separar o conteúdo textual do esqueleto estrutural (`<table>`, `<h1>`, `<ul>`).
 2. **Pesos por Relevância RAG:** Tags de dados estruturados (`table`, `tr`, `td`) recebem peso 25. Listas (`ul`, `li`) recebem peso 10. Títulos (`h1`-`h6`) recebem peso 5. Tags de formatação (`b`, `i`, `strong`) recebem peso 1.

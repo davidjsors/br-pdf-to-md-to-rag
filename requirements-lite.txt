@@ -7,3 +7,8 @@ python-Levenshtein>=0.25.0
 markitdown>=0.1.0
 pymupdf4llm>=0.0.10
 pyyaml>=6.0
+
+# Dependências Críticas RAG Linter
+tiktoken>=0.7.0
+langchain-text-splitters>=0.2.0
+markdown-it-py>=3.0.0

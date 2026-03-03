@@ -305,4 +305,4 @@ with tab_bench:
 | **0. Radar Espacial** | Classificação de Zonas | `unstructured` + `pdfplumber` |
 | **1. Fundação Narrativa** | Extração Textual (Duelo MDEval) | `MarkItDown` + `PyMuPDF4LLM` |
 | **2. Extração de Dados** | Tabelas com Precisão Geométrica | `pdfplumber` |
-| **3. Síntese e Validação** | Fusão, Limpeza PT-BR, Frontmatter | Heurísticas + `MDEval` |""")
+| **3. Síntese e Validação** | Fusão, Limpeza, Frontmatter | Heurísticas + `MDEval` |""")

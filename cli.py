@@ -31,6 +31,11 @@ def main():
         output_dir.mkdir(parents=True, exist_ok=True)
         
     def process_file(pdf_path: Path):
+        MAX_SIZE = 1 * 1024 * 1024
+        if pdf_path.stat().st_size > MAX_SIZE:
+             print(f"❌ Erro: {pdf_path.name} excede o limite de 1 MB.")
+             return False
+             
         print(f"Processando: {pdf_path.name} ...")
         result = process_pdf(pdf_path)
         if result.success:

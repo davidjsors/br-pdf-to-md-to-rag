@@ -41,22 +41,28 @@ st.markdown("#### Conversor e Limpador de PDFs brasileiros para Markdown otimiza
 
 uploaded_file = st.file_uploader("Arraste ou selecione seu PDF aqui", type=["pdf"])
 
+MAX_FILE_SIZE_MB = 1
+MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
+
 if uploaded_file is not None:
-    with tempfile.TemporaryDirectory() as temp_dir:
-        temp_dir_path = Path(temp_dir)
-        
-        file_path = temp_dir_path / uploaded_file.name
-        output_dir = temp_dir_path / "output"
-        output_dir.mkdir(exist_ok=True)
-        
-        # Salvando arquivo enviado
-        with open(file_path, "wb") as f:
-            f.write(uploaded_file.getbuffer())
-        
-        start_time = time.time()
-        with st.spinner("⏳ O Comitê de Especialistas v2 está analisando seu documento... (Radar, Narrativa, Tabelas, Visão e Juiz Mestre em execução)"):
-            # Agora process_pdf retorna um OrchestratorResult
-            result = process_pdf(file_path)
+    if uploaded_file.size > MAX_FILE_SIZE_BYTES:
+        st.error(f"❌ O arquivo excede o limite de {MAX_FILE_SIZE_MB} MB. Por favor, envie um arquivo menor para garantir a estabilidade do processamento lite.")
+    else:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_dir_path = Path(temp_dir)
+            
+            file_path = temp_dir_path / uploaded_file.name
+            output_dir = temp_dir_path / "output"
+            output_dir.mkdir(exist_ok=True)
+            
+            # Salvando arquivo enviado
+            with open(file_path, "wb") as f:
+                f.write(uploaded_file.getbuffer())
+            
+            start_time = time.time()
+            with st.spinner("⏳ O Comitê de Especialistas v2 está analisando seu documento... (Radar, Narrativa, Tabelas, Visão e Juiz Mestre em execução)"):
+                # Agora process_pdf retorna um OrchestratorResult
+                result = process_pdf(file_path)
                 
         duration = time.time() - start_time
             

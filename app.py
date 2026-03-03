@@ -67,6 +67,7 @@ with st.sidebar:
     st.divider()
     st.caption("Foco: Bases de Conhecimento RAG")
     st.caption("Limite: 2 MB | v2.5")
+    st.link_button("GitHub", "https://github.com/davidsdbr/br-pdf-to-md-to-rag")
 
 # ---------------------------------------------------------------------------
 # Cabeçalho Principal

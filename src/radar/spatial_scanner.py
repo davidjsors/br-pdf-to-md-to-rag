@@ -1,10 +1,19 @@
 """
-Fase 0 — Radar Espacial.
-Usa a biblioteca `unstructured` para varrer o PDF e classificar cada zona da página.
-Fallback: Se `unstructured` não estiver disponível, usa `pdfplumber` como radar básico.
+Fase 0 — Radar Espacial (HÍBRIDO - Mosaico Espacial).
+Integra a exatidão geométrica do OpenDataLoader-PDF (Bounding Boxes) e a classificação raster do Unstructured.
+Fallback: Se o ambiente não der suporte, recai para pdfplumber.
 """
+import tempfile
+import json
 from pathlib import Path
 from src.models import DocumentManifest, PageManifest, Zone, ZoneType
+from src.radar.json_to_md_parser import OpenDataLoaderParser
+
+try:
+    import opendataloader_pdf
+    HAS_ODL = True
+except ImportError:
+    HAS_ODL = False
 
 try:
     from unstructured.partition.pdf import partition_pdf
@@ -14,12 +23,83 @@ except ImportError:
 
 try:
     import pdfplumber
+    HAS_PDFPLUMBER = True
 except ImportError:
-    pdfplumber = None
+    HAS_PDFPLUMBER = False
 
 
-def _map_element_type(element_type: str) -> ZoneType:
-    """Mapeia tipos do unstructured para nosso ZoneType."""
+def _map_odl_type(node_type: str) -> ZoneType:
+    """Mapeia os nós do ODL para os tipos do nosso manifesto de zonas."""
+    mapping = {
+        "heading": ZoneType.TITLE,
+        "paragraph": ZoneType.TEXT,
+        "raw_text": ZoneType.TEXT,
+        "list": ZoneType.LIST,
+        "table_anchor": ZoneType.TABLE,
+        "image_anchor": ZoneType.IMAGE,
+        "scanned_image_page": ZoneType.IMAGE
+    }
+    return mapping.get(node_type, ZoneType.UNKNOWN)
+
+
+def scan_with_odl(pdf_path: Path) -> DocumentManifest:
+    """
+    Rastreio primário: Dispara o Java/OpenDataLoader para buscar Coordenadas Precisas.
+    Converte a árvore ODL JSON em objetos Zone do Comitê.
+    """
+    with tempfile.TemporaryDirectory() as td:
+        opendataloader_pdf.convert(
+            input_path=str(pdf_path),
+            output_dir=td,
+            format="json",
+            quiet=True
+        )
+        base_name = pdf_path.stem
+        out_file = Path(td) / f"{base_name}.json"
+        
+        if not out_file.exists():
+            raise FileNotFoundError(f"OpenDataLoader não gerou o JSON esperado em {out_file}")
+            
+        with open(out_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            
+        # Percorre usando nosso Parser construído
+        parser = OpenDataLoaderParser()
+        parser.parse_odl_json(data)
+        
+        # O parser achata (flatten) todos os nós sequencialmente sem hierarquia de paginas, 
+        # mas nós no parser nao inserimos a página neles. Vamos simplificar criando os Manifests.
+        # (Idealmente atualizar parser depois pra carregar página). Por enquanto,
+        # ODL devolve paginas nos elements base.
+        
+        manifest = DocumentManifest(pdf_path=pdf_path)
+        
+        # Vamos re-processar pegando pages direto daqui para separar os Manifests
+        for idx, page_node in enumerate(data.get("kids", [])):
+            page_num = idx + 1
+            pm = PageManifest(page_number=page_num)
+            
+            # Aproveitamos a lógica isolada do parser pra só essa página
+            page_parser = OpenDataLoaderParser()
+            page_parser._traverse_page(page_node)
+            
+            for node in page_parser.nodes:
+                zone = Zone(
+                    zone_type=_map_odl_type(node.type),
+                    page_number=page_num,
+                    content=node.text,
+                    bbox=tuple(node.bbox) if node.bbox else None,
+                    metadata={"source": "odl", "node_id": node.id}
+                )
+                pm.zones.append(zone)
+                
+            manifest.pages.append(pm)
+            
+        manifest.total_pages = len(manifest.pages)
+        return manifest
+
+
+def _map_unstructured_type(element_type: str) -> ZoneType:
     mapping = {
         "Title": ZoneType.TITLE,
         "NarrativeText": ZoneType.TEXT,
@@ -29,31 +109,29 @@ def _map_element_type(element_type: str) -> ZoneType:
         "Header": ZoneType.HEADER,
         "Footer": ZoneType.FOOTER,
         "FigureCaption": ZoneType.TEXT,
-        "UncategorizedText": ZoneType.TEXT,
     }
     return mapping.get(element_type, ZoneType.UNKNOWN)
 
-
 def scan_with_unstructured(pdf_path: Path) -> DocumentManifest:
-    """Varredura avançada via unstructured (hi_res)."""
+    """Varredura via unstructured (Fallback / Scan fallback)."""
     elements = partition_pdf(
         filename=str(pdf_path),
-        strategy="fast",  # Usar "hi_res" para detecção com modelo AI
+        strategy="fast",
         infer_table_structure=True,
     )
 
     pages_dict: dict[int, PageManifest] = {}
 
     for el in elements:
-        page_num = el.metadata.page_number if hasattr(el.metadata, 'page_number') else 1
+        page_num = getattr(el.metadata, 'page_number', 1)
         if page_num not in pages_dict:
             pages_dict[page_num] = PageManifest(page_number=page_num)
 
         zone = Zone(
-            zone_type=_map_element_type(type(el).__name__),
+            zone_type=_map_unstructured_type(type(el).__name__),
             page_number=page_num,
             content=str(el),
-            metadata={"category": type(el).__name__}
+            metadata={"source": "unstructured", "category": type(el).__name__}
         )
         pages_dict[page_num].zones.append(zone)
 
@@ -66,59 +144,40 @@ def scan_with_unstructured(pdf_path: Path) -> DocumentManifest:
 
 
 def scan_with_pdfplumber(pdf_path: Path) -> DocumentManifest:
-    """Varredura básica via pdfplumber (fallback)."""
-    if not pdfplumber:
+    """Varredura sub-básica via pdfplumber (fallback total)."""
+    if not HAS_PDFPLUMBER:
         return DocumentManifest(pdf_path=pdf_path)
 
     pages_list = []
     with pdfplumber.open(pdf_path) as pdf:
         for page in pdf.pages:
             pm = PageManifest(page_number=page.page_number)
-
-            # Detectar tabelas
-            tables = page.find_tables()
-            for t in tables:
-                pm.zones.append(Zone(
-                    zone_type=ZoneType.TABLE,
-                    page_number=page.page_number,
-                    bbox=t.bbox,
-                ))
-
-            # Detectar texto (excluindo áreas de tabelas)
-            text = page.extract_text()
-            if text and text.strip():
-                pm.zones.append(Zone(
-                    zone_type=ZoneType.TEXT,
-                    page_number=page.page_number,
-                    content=text,
-                ))
-
-            # Detectar imagens
-            if page.images:
-                for img in page.images:
-                    pm.zones.append(Zone(
-                        zone_type=ZoneType.IMAGE,
-                        page_number=page.page_number,
-                        bbox=(img['x0'], img['top'], img['x1'], img['bottom']),
-                    ))
-
+            # Imagens
+            for img in page.images:
+                 pm.zones.append(Zone(ZoneType.IMAGE, page.page_number, bbox=(img['x0'], img['top'], img['x1'], img['bottom'])))
             pages_list.append(pm)
-
-    return DocumentManifest(
-        pdf_path=pdf_path,
-        pages=pages_list,
-        total_pages=len(pages_list)
-    )
+            
+    return DocumentManifest(pdf_path=pdf_path, pages=pages_list, total_pages=len(pages_list))
 
 
 def scan_pdf(pdf_path: Path) -> DocumentManifest:
-    """Ponto de entrada do Radar. Tenta unstructured, fallback pdfplumber."""
+    """
+    Ponto de entrada do Radar Híbrido.
+    Tenta ODL para recuperar vetores geométricos (BBox). Se falhar, Unstructured.
+    """
+    if HAS_ODL:
+        try:
+            print("[Radar] Usando OpenDataLoader (Bounding Box)...")
+            return scan_with_odl(pdf_path)
+        except Exception as e:
+            print(f"[Radar] Falha no OpenDataLoader: {e}. Fallback unstructured.")
+
     if HAS_UNSTRUCTURED:
         try:
-            print("[Radar] Usando unstructured (hi_res)...")
+            print("[Radar] Usando Unstructured (AI Fallback)...")
             return scan_with_unstructured(pdf_path)
         except Exception as e:
             print(f"[Radar] Falha no unstructured: {e}. Fallback pdfplumber.")
 
-    print("[Radar] Usando pdfplumber (fallback)...")
+    print("[Radar] Usando pdfplumber (Fallback Critico)...")
     return scan_with_pdfplumber(pdf_path)

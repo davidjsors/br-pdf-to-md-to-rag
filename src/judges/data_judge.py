@@ -1,46 +1,35 @@
 """
 Juiz de Dados — Etapa 2.
-Recebe tabelas do docling (semântica) e do pdfplumber (precisão).
-Funde as melhores versões.
+Recebe o Manifesto Híbrido da Fase 0 (ODL / Unstructured) contendo Mosaico Geométrico com as Coordenadas das tabelas e recorta as tabelas exatas.
 """
 from pathlib import Path
 from src.models import DocumentManifest, StageResult
-from src.specialists.table_docling import extract_tables_docling
 from src.specialists.table_plumber import extract_tables_plumber
 
 
 def judge_data(pdf_path: Path, manifest: DocumentManifest) -> StageResult:
     """
     O Juiz de Dados:
-    1. Executa docling e pdfplumber.
-    2. Compara as tabelas por qualidade.
-    3. Gera a lista final de tabelas unificadas.
+    1. Verifica se houve tabela via Radar.
+    2. Envia para o pdfplumber fazer o crop nas coordenadas.
+    3. Retorna a lista final de tabelas unificadas.
     """
     if not manifest.pages_with_tables:
         return StageResult(
             stage_name="Etapa 2 - Tabelas",
             tables=[],
-            metadata={"skipped": True, "reason": "Nenhuma tabela detectada pelo Radar."},
+            metadata={"skipped": True, "reason": "Nenhuma tabela detectada pelo Radar Mosaico."},
             success=True,
         )
 
-    print("[Juiz de Dados] Executando especialistas de tabelas...")
+    print("[Juiz de Dados] Extraindo Bounding Boxes das tabelas via Plumber...")
 
-    tables_docling = extract_tables_docling(pdf_path)
-    tables_plumber = extract_tables_plumber(pdf_path)
+    final_tables = extract_tables_plumber(pdf_path, manifest)
 
-    # Heurística de fusão:
-    # Usar docling se disponível (melhor semântica), senão plumber.
-    # Se ambos geraram tabelas, preferir o que gerou mais (melhor cobertura).
-    if len(tables_docling) >= len(tables_plumber) and tables_docling:
-        final_tables = tables_docling
-        winner = f"docling ({len(tables_docling)} tabelas)"
-    elif tables_plumber:
-        final_tables = tables_plumber
-        winner = f"pdfplumber ({len(tables_plumber)} tabelas)"
+    if final_tables:
+        winner = f"pdfplumber ({len(final_tables)} tabelas via Crop)"
     else:
-        final_tables = []
-        winner = "nenhum (sem tabelas extraídas)"
+        winner = "nenhum (sem tabelas extraídas ou erro de CROP)"
 
     print(f"[Juiz de Dados] Vencedor: {winner}")
 
@@ -49,8 +38,7 @@ def judge_data(pdf_path: Path, manifest: DocumentManifest) -> StageResult:
         tables=final_tables,
         metadata={
             "winner": winner,
-            "docling_count": len(tables_docling),
-            "plumber_count": len(tables_plumber),
+            "plumber_count": len(final_tables),
         },
         success=True,
     )

@@ -16,7 +16,7 @@ def _insert_table_anchors(text: str, manifest: DocumentManifest) -> str:
     nas posições onde o Radar detectou tabelas.
     """
     for page in manifest.pages:
-        table_count = 0
+        table_count: int = 0
         for zone in page.zones:
             if zone.zone_type == ZoneType.TABLE:
                 table_count += 1
@@ -29,47 +29,69 @@ def _insert_table_anchors(text: str, manifest: DocumentManifest) -> str:
     return text
 
 
+def _extract_narrative_from_odl(manifest: DocumentManifest) -> str:
+    """Reconstrói o markdown base a partir das zonas do ODL no Radar."""
+    lines = []
+    for page in manifest.pages:
+        for zone in page.zones:
+            if zone.zone_type == ZoneType.TITLE:
+                lines.append(f"\n## {zone.content.strip()}\n")
+            elif zone.zone_type in [ZoneType.TEXT, ZoneType.LIST]:
+                lines.append(f"{zone.content.strip()}")
+            elif zone.zone_type == ZoneType.TABLE:
+                pass # Anchor will be injected later
+    return "\n".join(lines)
+
+
 def judge_narrative(pdf_path: Path, manifest: DocumentManifest) -> StageResult:
     """
-    O Juiz Narrativo:
-    1. Executa ambos os especialistas em paralelo.
-    2. Compara volume de texto para detectar lacunas.
-    3. Funde no bloco mais completo.
-    4. Insere âncoras de tabelas.
+    O Juiz Narrativo (Mosaico Espacial ODL):
+    1. Executa MarkItDown e PyMuPDF.
+    2. Lê a tradução nativa originada do OpenDataLoader no Manifesto.
+    3. Compara volume e estrutura para definir a base principal.
+    4. Insere âncoras de tabelas de forma assertiva.
     """
-    print("[Juiz Narrativo] Executando especialistas...")
+    print("[Juiz Narrativo] Acordando especialistas...")
 
-    # Execução dos especialistas
+    # Execução dos especialistas puros
     md_markitdown = extract_narrative_markitdown(pdf_path)
     md_pymupdf = extract_narrative_pymupdf(pdf_path)
+    
+    # Extraindo do nosso Mosaico BBox (ODL)
+    md_odl = _extract_narrative_from_odl(manifest)
 
     len_mit = len(md_markitdown)
     len_pym = len(md_pymupdf)
+    len_odl = len(md_odl)
 
-    print(f"[Juiz Narrativo] MarkItDown: {len_mit} chars | pymupdf4llm: {len_pym} chars")
+    print(f"[Juiz Narrativo] Competidores -> MarkItDown: {len_mit} | PyMuPDF: {len_pym} | OpenDataLoader: {len_odl}")
 
-    # Heurística de fusão:
-    # Se a diferença de volume for > 20%, o maior provavelmente capturou mais conteúdo.
-    # Usamos o maior como base, mas verificamos se o menor tem conteúdo ausente.
-
-    if len_mit == 0 and len_pym == 0:
+    if len_mit == 0 and len_pym == 0 and len_odl == 0:
         return StageResult(
             stage_name="Etapa 1 - Narrativa",
             success=False,
-            error="Nenhum especialista conseguiu extrair texto."
+            error="Nenhum especialista conseguiu extrair texto (documento possivelmente Raster/Zicado)."
         )
 
-    # Escolher a base mais rica
-    if len_pym > len_mit * 1.2:
-        # pymupdf capturou significativamente mais → ele é a base
-        base = md_pymupdf
-        winner = "pymupdf4llm (maior volume)"
-    else:
-        # MarkItDown é a base (melhor estrutura semântica)
-        base = md_markitdown
-        winner = "MarkItDown (melhor estrutura)"
+    # Escolher a base mais rica. A prioridade é:
+    # 1. OpenDataLoader (Por ter coordenadas limpas, só se não falhou miseravelmente)
+    # 2. MarkItDown (Estrutura superior se o ODL falhou)
+    # 3. PyMuPDF (Fallback para PDF mal-formatado se MarkItDown falhar e ODL zerar)
+    
+    base = md_odl
+    winner = "OpenDataLoader (Geometria Mosaico)"
+    
+    # Se ODL foi menor que 50% dos outros, PDF é confuso para parser de caixas, confia na IA de extração de linha:
+    max_len = max(len_mit, len_pym)
+    if len_odl < (max_len * 0.5):
+         if len_pym > len_mit * 1.2:
+             base = md_pymupdf
+             winner = "pymupdf4llm (Fallback IA)"
+         else:
+             base = md_markitdown
+             winner = "MarkItDown (Fallback Semântico)"
 
-    # Inserir âncoras de tabelas
+    # Inserir âncoras de tabelas para o Juiz de Dados processar depois
     final_narrative = _insert_table_anchors(base, manifest)
 
     return StageResult(
@@ -77,9 +99,11 @@ def judge_narrative(pdf_path: Path, manifest: DocumentManifest) -> StageResult:
         content=final_narrative,
         metadata={
             "winner": winner,
+            "odl_chars": len_odl,
             "markitdown_chars": len_mit,
             "pymupdf_chars": len_pym,
             "anchors_inserted": len(manifest.pages_with_tables),
         },
         success=True,
     )
+

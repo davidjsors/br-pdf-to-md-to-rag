@@ -66,23 +66,12 @@ class StructuralDensityEvaluator:
         self.gamma = gamma
         
         # --- CLASS 1: TAGS DE DADOS REAIS (Linear: Sem Decaimento -> Gama 1.0) ---
-        # Matrizes e Listas são massivas em PDFs. Cada linha deve dar a mesma pontuação.
         self.linear_tags = {'table', 'tr', 'th', 'td', 'ul', 'ol', 'li'}
         
         # --- CLASS 2: TAGS COSMÉTICAS/HIERARQUIA (Decaimento -> Gama 0.5) ---
-        # Sofrem punição caso ferramentas ruins de OCR repitam em looping (vandalismo/prolixidade)
         self.decay_tags = {'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'b', 'strong', 'i', 'em', 'hr', 'pre', 'code', 'blockquote', 'math', 'p', 'a'}
         
         self.valuable_tags = self.linear_tags.union(self.decay_tags)
-        
-        # --- PESOS BASE (MDEval: High Impact vs Secondary) ---
-        # O estudo confere peso máximo (10) para estrutura primária e peso menor (5) para outros
-        
-        # Tags de Alto Impacto Estrutural (Peso Base = 10)
-        self.high_impact_tags = {'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'pre', 'code', 'math', 'ul', 'ol', 'li', 'b', 'strong', 'table', 'tr', 'th', 'td'}
-        
-        # Tags Secundárias (Peso Base = 5)
-        self.secondary_tags = {'i', 'em', 'blockquote', 'a', 'hr', 'p'}
         
         # Padrões de Lixo Visual Brasileiro compilados para a penalidade
         self.garbage_patterns = [
@@ -105,23 +94,32 @@ class StructuralDensityEvaluator:
 
     def calculate_d_rule_bonus(self, tags: list[str]) -> float:
         """
-        Calcula o Score Estrutural base cruzando o Peso Base (10 ou 5) com a Natureza (Linear ou Decaimento).
+        Gera o Score Estrutural focado em RAG:
+        1. Matrizes Inteiras (table, tr) são o Santo Graal (Peso 25, Linear).
+        2. Listas Estruturadas (ul, li) são excelentes para embeddings (Peso 10, Linear).
+        3. Títulos (h1-h6) dão delimitação de bloco, mas sofrem D-Rule (Peso 5, Decaimento 0.5).
+        4. Formatação (b, p, em) é esteticismo (Peso 1, Decaimento 0.5) para punir spam.
         """
         bonus_score = 0.0
         tag_counts: dict[str, int] = defaultdict(int)
         
         for tag in tags:
-            # 1. Definir o Peso Base pelo Impacto
-            base_score = 10.0 if tag in self.high_impact_tags else 5.0
-            
-            # 2. Verificar o status de repetição da tag
+            # 1. Definir o Multiplicador Linear vs D-Rule (Decaimento)
             current_count = tag_counts[tag]
-            
-            # 3. Aplicar o Multiplicador Linear vs D-Rule
             if tag in self.linear_tags:
-                decay_multiplier = 1.0 # Dados faturam linearmente
+                decay_multiplier = 1.0 # Dados faturam infinitamente
             else:
-                decay_multiplier = self.gamma ** current_count # Cosmética sofre o achatamento
+                decay_multiplier = self.gamma ** current_count # Cosmética cai exponencialmente
+                
+            # 2. Definir o Peso Base pelo Valor Real no RAG (Evitando inflações da PyMuPDF)
+            if tag in ['table', 'tr', 'th', 'td']:
+                base_score = 25.0
+            elif tag in ['ul', 'ol', 'li']:
+                base_score = 10.0
+            elif tag in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'pre', 'code', 'math']:
+                base_score = 5.0
+            else:
+                base_score = 1.0
             
             bonus_score += (base_score * decay_multiplier)
             tag_counts[tag] += 1

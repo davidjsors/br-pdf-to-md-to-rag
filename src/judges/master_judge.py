@@ -25,17 +25,18 @@ def synthesize_master(
     tables_to_inject = data_res.tables
     
     for table_md in tables_to_inject:
-        # A injeção funciona localizando a primeira âncora disponível
-        # e substituindo-a com o markup puro da tabela.
+        # Ponto de Refino: Injetamos um Header para garantir que a tabela herde hierarquia 
+        # e não se torne um órfão no RAG, além de remover o comentário HTML problemático para o AST.
+        table_with_header = f"\n\n### [Tabela Detectada]\n\n{table_md}\n\n"
+        
         master_text = re.sub(
             r'<!-- TABLE_ANCHOR_p\d+_t\d+ -->', 
-            f"\n\n{table_md}\n\n<!-- TABELA_CONSOLIDADA -->", 
+            table_with_header, 
             master_text, 
             count=1
         )
 
-    # Remove âncoras que sobraram caso número de tabelas identificadas pelo plumper 
-    # não combinem com a varredura do parser
+    # Remove âncoras vazias sem deixar comentários HTML extras
     master_text = re.sub(r'<!-- TABLE_ANCHOR_p\d+_t\d+ -->', '', master_text)
 
     # 2. Acoplar Elementos Visuais Escaneados (Se houver contingência/Marker)

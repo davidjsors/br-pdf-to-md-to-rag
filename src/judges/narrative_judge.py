@@ -15,16 +15,20 @@ def _insert_table_anchors(text: str, manifest: DocumentManifest) -> str:
     Insere âncoras <!-- TABLE_ANCHOR_pX_tY --> no fluxo narrativo
     nas posições onde o Radar detectou tabelas.
     """
+    # Proteção RAG: Se houver tabelas e elas foram injetadas ao final (como é o caso atual)
+    # precisamos de um header de seção para evitar "Orphan Chunks".
+    if manifest.pages_with_tables:
+        header_section = "\n\n## 📊 Tabelas e Matrizes de Dados Extraídas\n"
+        text += str(header_section)
+
     for page in manifest.pages:
         table_count: int = 0
         for zone in page.zones:
             if zone.zone_type == ZoneType.TABLE:
                 table_count += 1
-                anchor = f"\n\n<!-- TABLE_ANCHOR_p{page.page_number}_t{table_count} -->\n\n"
-                # Heurística: inserir âncora após a última linha de texto 
-                # que precede a posição da tabela na página
-                # Por simplicidade, adicionamos ao final do bloco narrativo
-                text += anchor
+                # Âncora limpa
+                anchor = f"\n\n<!-- TABLE_ANCHOR_p{page.page_number}_t{table_count} -->\n"
+                text += str(anchor)
 
     return text
 

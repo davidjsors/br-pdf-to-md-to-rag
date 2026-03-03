@@ -63,7 +63,7 @@ st.markdown("""
 
 with st.sidebar:
     st.title("Sobre")
-    st.markdown("Conversor inteligente de PDFs brasileiros para Markdown estruturado.")
+    st.markdown("Conversor de PDFs para Markdown estruturado.")
     st.divider()
     st.caption("Foco: Bases de Conhecimento RAG")
     st.caption("Limite: 2 MB | v2.5")
@@ -71,10 +71,11 @@ with st.sidebar:
 # ---------------------------------------------------------------------------
 # Cabeçalho Principal
 # ---------------------------------------------------------------------------
-st.title("BR PDF → MD → RAG")
-st.caption("Extração estrutural limpa e normalizada para bancos vetoriais")
+st.title("Transforme PDF em Markdown otimizado para o seu RAG")
+st.caption("Conversão de documentos não estruturados em Markdown validado para bancos vetoriais.")
 
-# Gestão de Estado
+# Gestão de Estado e o subtitulo?
+
 if "r_data" not in st.session_state: st.session_state.r_data = None
 if "r_bench" not in st.session_state: st.session_state.r_bench = None
 if "r_fid" not in st.session_state: st.session_state.r_fid = None

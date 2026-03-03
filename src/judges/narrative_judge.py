@@ -8,6 +8,7 @@ from pathlib import Path
 from src.models import DocumentManifest, StageResult, ZoneType
 from src.specialists.narrative_markitdown import extract_narrative_markitdown
 from src.specialists.narrative_pymupdf import extract_narrative_pymupdf
+from src.metrics.eval_metrics import StructuralDensityEvaluator
 
 
 def _insert_table_anchors(text: str, manifest: DocumentManifest) -> str:
@@ -28,36 +29,47 @@ def _insert_table_anchors(text: str, manifest: DocumentManifest) -> str:
 
 def judge_narrative(pdf_path: Path, manifest: DocumentManifest) -> StageResult:
     """
-    O Juiz Narrativo (Stack Lite):
+    O Juiz Narrativo (Stack Lite - Otimizada por Saúde):
     1. Executa MarkItDown e PyMuPDF.
-    2. Compara volume e estrutura para definir a base principal.
-    3. Insere âncoras de tabelas para o próximo estágio.
+    2. Avalia a saúde estrutural (MDEval) de ambos os outputs.
+    3. Escolhe o vencedor por Saúde (e não apenas Volume).
     """
     print("[Juiz Narrativo] Acordando especialistas...")
+
+    # Instancia avaliador de saúde
+    evaluator = StructuralDensityEvaluator()
 
     # Execução dos especialistas puros
     md_markitdown = extract_narrative_markitdown(pdf_path)
     md_pymupdf = extract_narrative_pymupdf(pdf_path)
     
-    len_mit = len(md_markitdown)
-    len_pym = len(md_pymupdf)
+    # Avaliação de Saúde em tempo real
+    score_mit = evaluator.evaluate(md_markitdown)
+    score_pym = evaluator.evaluate(md_pymupdf)
 
-    print(f"[Juiz Narrativo] Competidores -> MarkItDown: {len_mit} | PyMuPDF: {len_pym}")
+    print(f"[Juiz Narrativo] Competidores -> MarkItDown (Saúde: {score_mit}%) | PyMuPDF (Saúde: {score_pym}%)")
 
-    if len_mit == 0 and len_pym == 0:
+    if len(md_markitdown) == 0 and len(md_pymupdf) == 0:
         return StageResult(
             stage_name="Etapa 1 - Narrativa",
             success=False,
             error="Nenhum especialista conseguiu extrair texto."
         )
 
-    # Decisão Bimodal
-    if len_pym > len_mit * 1.5:
+    # Decisão BASEADA EM SAÚDE MDE
+    # O motor com melhor estrutura ganha a base do documento
+    if score_pym > score_mit:
         base = md_pymupdf
-        winner = "pymupdf4llm (Maior Volume)"
+        winner = f"pymupdf4llm (Saúde Superior: {score_pym}%)"
     else:
         base = md_markitdown
-        winner = "MarkItDown (Estrutura Semântica)"
+        winner = f"MarkItDown (Saúde Superior: {score_mit}%)"
+
+    # Caso ambos tenham saúde zerada, desempata pro PyMuPDF se houver volume
+    if score_pym == 0 and score_mit == 0:
+        if len(md_pymupdf) > len(md_markitdown):
+            base = md_pymupdf
+            winner = "pymupdf4llm (Desempate por Volume)"
 
     # Inserir âncoras de tabelas para o Juiz de Dados processar depois
     final_narrative = _insert_table_anchors(base, manifest)
@@ -67,8 +79,10 @@ def judge_narrative(pdf_path: Path, manifest: DocumentManifest) -> StageResult:
         content=final_narrative,
         metadata={
             "winner": winner,
-            "markitdown_chars": len_mit,
-            "pymupdf_chars": len_pym,
+            "markitdown_chars": len(md_markitdown),
+            "pymupdf_chars": len(md_pymupdf),
+            "score_mit": score_mit,
+            "score_pym": score_pym
         },
         success=True,
     )

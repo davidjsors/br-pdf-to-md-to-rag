@@ -1,75 +1,94 @@
-# br-pdf-to-md-to-rag
+# br-pdf-to-md-to-rag 🇧🇷📄
 
-Conversor especializado de PDFs governamentais, técnicos e empresariais brasileiros para Markdown limpo, estruturado e otimizado para uso em pipelines de RAG (Retrieval-Augmented Generation).
+> Conversor especializado de PDFs governamentais, técnicos e empresariais brasileiros para Markdown limpo, estruturado e otimizado para uso em pipelines de RAG (Retrieval-Augmented Generation).
+
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://pdf2md2rag.streamlit.app/)
 
 ## O Problema que Resolvemos
 
-Ferramentas generalistas abordam a conversão mapeando o conteúdo visual para o MD fielmente (como o Microsoft MarkItDown, PyMuPDF, pdf2image). O problema disso para o cenário brasileiro é que documentos do SEBRAE, Receita Federal, diários oficiais e cartilhas técnicas geram uma base poluída com "lixo" fixo, que frequentemente causa **alucinações graves em modelos LLM**:
+Ferramentas generalistas (como Microsoft MarkItDown, PyMuPDF, pdf2image) abordam a conversão mapeando o conteúdo visual para o MD fielmente. O problema no cenário brasileiro é que documentos do SEBRAE, Receita Federal, diários oficiais e cartilhas técnicas geram uma base poluída com "lixo" fixo, causando **alucinações graves em modelos LLM**:
 
-- ❌ Séries numéricas de eixos de gráficos (ex: `1 2 3 ... 31`) interpretadas como dados reais no contexto.
-- ❌ Escalas de preços vazias (`R$ 0,00`, ou até repetitivos `R$`) alimentadas como sendo contextos financeiros absolutos.
-- ❌ Cabeçalhos e rodapés repetitivos em todas as páginas, poluindo a densidade do texto ("chunking").
-- ❌ Palavras separadas com hífens pela quebra na diagramação de páginas virando palavras desconexas no banco vetorial.
+- ❌ Séries numéricas de eixos de gráficos (`1 2 3 ... 31`) interpretadas como dados reais.
+- ❌ Escalas vazias (`R$ 0,00`) sendo tratadas como sendo contextos financeiros absolutos.
+- ❌ Cabeçalhos e rodapés repetitivos, diluindo a densidade do texto ("chunking").
+- ❌ Palavras separadas com hífens pela diagramação virando palavras desconexas.
 - ❌ Tabelas textuais transformadas de forma amorfa e incompreensível para embeddings.
 
-## Nossa Solução USP (Unique Selling Proposition)
+## ⚙️ A Solução: Arquitetura "Comitê de Especialistas V2"
 
-O **BR-PDF-to-MD** não extrai tudo "assim como está", mas sim aplicando uma camada super densa de limpeza (**cleaner semantic**) voltada unicamente à **sanitização em português pt-BR**.
+Nossa abordagem não extrai tudo "assim como está". Nós utilizamos **8 ferramentas lideradas por 4 Juízes de IA** orquestradas sequencialmente para extrair e filtrar os dados perfeitos:
 
-## ⚖️ O Comitê de Especialistas (Arquitetura de Orquestração v2)
+| Etapa | Juiz Responsável | Ferramentas (Motores) | Ação Principal |
+|---|---|---|---|
+| **0. Radar** | `Spatial Scanner` | `unstructured[pdf]` | Varre a página, identifica delimitadores e roteia blocos (imagens vs. tabelas vs. parágrafos). |
+| **1. Narrativa** | `Narrative Judge` | `MarkItDown`, `pymupdf4llm` | Reconstrói a prosa primária, preservando títulos e pondo *âncoras* onde havia matrizes. |
+| **2. Tabelas** | `Data Judge` | `docling`, `pdfplumber` | Extrai a semântica pesada de matrizes/células e garante coordenadas geométricas brutas. |
+| **3. Visual** | `Vision Judge` | `marker-pdf`, `pytesseract` | Opcional: Processa páginas escaneadas puras através de Visão Computacional. |
+| **4. Validação** | `Master Judge` | `MDEval` (Algoritmo) | Funde as tabelas da Etapa 2 dentro da Narrativa da Etapa 1. Calcula a **Saúde Estrutural** na métrica acadêmica e aprova. |
 
-Em vez de depender de um único motor, utilizamos **8 ferramentas lideradas por 4 Juízes** em etapas sequenciais:
-
-1.  **Fase 0 (Radar)**: O *unstructured* varre a página e identifica as posições de parágrafos, tabelas e imagens.
-2.  **Etapa 1 (Narrativa)**: *MarkItDown* e *pymupdf4llm* reconstroem a prosa e a hierarquia de títulos. O Juiz Narrativo insere *âncoras* onde havia tabelas.
-3.  **Etapa 2 (Tabelas)**: *docling* (IBM) entende a semântica pesada das matrizes, enquanto o *pdfplumber* garante a precisão das coordenadas BR. (Só acionado se o Radar detectar tabelas).
-4.  **Etapa 3 (Visual)**: *marker-pdf* usa IA pesada para transformar layouts de imagem em Markdown, com *Tesseract OCR* como fallback rápido. (Só acionado se houver blocos de imagem).
-5.  **Etapa 4 (Síntese e Validação)**: O **Juiz Mestre** junta tudo. Ele substitui as âncoras da Etapa 1 pelas Tabelas da Etapa 2, aplica regras de filtragem BR (`cleaner.py`) e roda **obrigatoriamente** o algoritmo **MDEval** para aprovar a Saúde Estrutural final.
 ---
 
-## 🌐 Como Acessar a Interface Web (Demo ao Vivo)
+## 🚀 Quick Start (Usando na Web)
 
-Para você que quer usar a ferramenta sem instalar nada:
+Acesse a nossa Interface Web (Hospedada no Streamlit Community Cloud gratuito):
 
-[ ![Abra no Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg) ](https://pdf2md2rag.streamlit.app/)
+👉 **[Acessar br-pdf-to-md-to-rag Online](https://pdf2md2rag.streamlit.app/)**
 
-> **Nota:** Este app está hospedado no [Streamlit Community Cloud](https://streamlit.io/cloud). A hospedagem para projetos open-source é **gratuita**.
+A interface possui duas abas:
+1. **Conversor (Produção):** Suba seu PDF e receba o Markdown limpo e as métricas.
+2. **Arena de Benchmark:** Teste o seu PDF em tempo real contra todas as ferramentas de mercado simultaneamente e veja gráficos provando quem extrai a melhor estrutura (Score MDEval).
 
-## 💻 Instalação Local e CLI
+---
 
+## 💻 Instalação Local e Uso CLI
+
+Se você quiser rodar localmente no seu computador ou servidor para automatizar massas de dados:
+
+### 1. Clonar o projeto
 ```bash
 git clone https://github.com/davidjsors/br-pdf-to-md-to-rag.git
 cd br-pdf-to-md-to-rag
-pip install -r requirements.txt
 ```
 
-## Como Usar a Ferramenta CLI
+### 2. Escolher o Ambiente (Cuidado com o peso!)
+A arquitetura V2 usa modelos de Inteligência Artificial potentes. Selecione a versão de requirements:
 
-Você pode extrair arquivos definidos, ou rodar por diretório via CLI `argparse`. Não há mais "caminhos hardcore no código"!
+* **Modo HARDCORE (Recomendado / Nuvem):** Baixa o `docling`, `marker` etc. Requer vários GBs de download de modelos na primeira execução.
+  ```bash
+  python -m venv .venv
+  source .venv/bin/activate
+  pip install -r requirements.txt
+  ```
+
+* **Modo LITE (Rápido / Fallback Local):** Instala apenas `MarkItDown` e `PyMuPDF`. O orquestrador detecta que não há IA visual, pula as IAs pesadas da IBM, usa as heurísticas locais e entrega resultado no melhor tempo possível.
+  ```bash
+  python -m venv .venv
+  source .venv/bin/activate
+  pip install -r requirements-lite.txt
+  ```
+
+### 3. Rodar Ferramenta CLI em Massa
+Use o script CLI criado para conversões em lotes na esteira de dados RAG da sua empresa. Sem hardcodes.
 
 ```bash
-# Converter apenas um arquivo PDF
+# Converter apenas um arquivo
 python cli.py caminho/para/documento.pdf -o resultados/
 
-# Converter todos os arquivos PDF de um diretório
+# Converter todos os arquivos de um diretório
 python cli.py caminho/para/diretorio_com_pdfs/ -o resultados/
 ```
 
-## 🌐 Interface Web (Web App)
-
-Criamos uma interface visual para os usuários subirem seus PDFs no navegador de forma simples e compararem o **render visual do Markdown** com o seu **código bruto** extraído, ambos já livres do lixo do documento.
-
-Basta rodar na pasta raiz do projeto:
-
+### 4. Subir a Interface Local
+Para ter a experiência visual na sua rede local:
 ```bash
 streamlit run app.py
 ```
 
-O seu navegador padrão abrirá a plataforma (em geral, na porta `localhost:8501`).
+---
 
-## Como Usar Como Biblioteca (Modularizado)
+## 🧩 Uso como Biblioteca Python (Modularizado)
 
-Para times que desenvolvem bibliotecas ou outros pipelines de extração, importando somente sua lógica de tratamento.
+Para times desenvolvendo outras bibliotecas que só querem alavancar a limpeza léxica PT-BR:
 
 ```python
 from src.cleaner import clean_text_block
@@ -81,25 +100,19 @@ print(texto_limpo)
 # Output: O fluxo financeiro continuou operando as escalas com ganhos de
 ```
 
-### Contribuindo
+Ou usando o Orquestrador Completo no seu código:
+```python
+from pathlib import Path
+from src.orchestrator import process_pdf
 
-Pull requests são super bem-vindos. Fique à vontade para submeter suas heurísticas `regex` pra filtrar ainda mais casos "exóticos" dos PDFs de cartilhas contábeis BR.
-
-## Referências e Créditos
-
-Este projeto integra heurísticas e métricas inspiradas no **MDEval-Benchmark**, um framework acadêmico para avaliar a consciência de Markdown em LLMs.
-
-**Citação Original:**
-```bibtex
-@inproceedings{chen2025mdeval,
-  title={MDEval: Evaluating and Enhancing Markdown Awareness in Large Language Models},
-  author={Zhongpu Chen and Yinfeng Liu and Long Shi and Zhi-Jie Wang and Xingyan Chen and Yu Zhao and Fuji Ren},
-  booktitle={Proceedings of the ACM Web Conference},
-  year={2025}
-}
+resultado = process_pdf(Path("relatorio.pdf"))
+if resultado.success:
+    print(f"Nota de Qualidade Estrutural: {resultado.mdeval_score}%")
+    print(resultado.final_markdown)
 ```
 
-Agradecemos ao grupo **SWUFE-DB-Group** pelo compartilhamento do benchmark [MDEval](https://github.com/SWUFE-DB-Group/MDEval-Benchmark).
+## 📚 Referências e Créditos
+Este projeto integra métricas inspiradas no **MDEval-Benchmark**, que usamos no estágio de validação estrutural do Juiz Mestre. Agradecimentos ao grupo **SWUFE-DB-Group** (WWW '25).
 
-## Licença
+## 📄 Licença
 [MIT](LICENSE)

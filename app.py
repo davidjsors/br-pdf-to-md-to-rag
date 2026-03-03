@@ -81,16 +81,6 @@ if uploaded_file is not None:
                     st.subheader("1. Seu Markdown Otimizado (Resultado Final) 🏆")
                     st.success(f"Conversão concluída em **{duration:.2f}s** com o Comitê V2!")
                     
-                    # Download button no topo para facilidade
-                    st.download_button(
-                        label="Baixar Markdown RAG-Ready 📥",
-                        data=md_content,
-                        file_name=md_path.name,
-                        mime="text/markdown",
-                        use_container_width=True,
-                        type="primary"
-                    )
-                    
                     col1, col2 = st.columns(2)
                     
                     # Lógica para limpar o preview (remove YAML gigante)
@@ -104,7 +94,16 @@ if uploaded_file is not None:
                         body_content = md_content
 
                     with col1:
-                        st.markdown("**📝 Código Fonte (Markdown)**")
+                        # Cabeçalho compacto com Download
+                        c1, c2 = st.columns([0.8, 0.2])
+                        c1.markdown("**📝 Código Fonte (Markdown)**")
+                        c2.download_button(
+                            label="📥",
+                            data=md_content,
+                            file_name=md_path.name,
+                            mime="text/markdown",
+                            help="Baixar Markdown RAG-Ready"
+                        )
                         with st.container(height=500, border=True):
                             st.code(md_content, language="markdown")
                     with col2:

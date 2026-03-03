@@ -63,8 +63,14 @@ class StructuralDensityEvaluator:
         """
         self.gamma = gamma
         
-        # Tags de alto valor estrutural que merecem pontuação
-        self.valuable_tags = {'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'table', 'tr', 'th', 'td', 'ul', 'ol', 'li', 'b', 'strong', 'i', 'em'}
+        # Tags de Dados Reais (Volume de Matrizes e Tópicos) -> Sem Decaimento (Linear)
+        self.linear_tags = {'table', 'tr', 'th', 'td', 'ul', 'ol', 'li'}
+        
+        # Tags de Hierarquia e Cosmética -> Com Decaimento (Punição por Vandalismo/Repetição)
+        # Blocos de código, aspas falsas e excesso de formatação indicam quebra de leitura de OCR
+        self.decay_tags = {'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'b', 'strong', 'i', 'em', 'hr', 'pre', 'code', 'blockquote', 'math'}
+        
+        self.valuable_tags = self.linear_tags.union(self.decay_tags)
         
         # Padrões de Lixo Visual Brasileiro compilados para a penalidade
         self.garbage_patterns = [
@@ -87,20 +93,24 @@ class StructuralDensityEvaluator:
 
     def calculate_d_rule_bonus(self, tags: list[str]) -> float:
         """
-        Calcula o Score Estrutural base considerando o decaimento por repetição local.
-        (Quanto mais repetida for a tag, menos ela adiciona ao score para evitar hacks).
+        Calcula o Score Estrutural base considerando a natureza da tag (Linear vs Decaimento).
         """
         bonus_score = 0.0
         tag_counts: dict[str, int] = defaultdict(int)
         
         for tag in tags:
             current_count = tag_counts[tag]
-            # Fórmula do D-Rule: peso = (gamma) ^ (número de repetições anteriores)
-            weight = self.gamma ** current_count
             
-            # Algumas tags vitais podem ter pesos básicos maiores, mas aqui
-            # usaremos o peso natural normalizado do artigo. Tabelas são ouro.
-            base_multiplier = 2.0 if tag in ['table', 'tr'] else 1.0
+            # Se a tag for estrutural linear (Dados/Tabelas/Listas), peso sempre 1.0 (sem decaimento)
+            if tag in self.linear_tags:
+                weight = 1.0
+                # Super-bônus para o início de uma tabela ou linha pura, pois isso é o Santo Graal do extrator
+                base_multiplier = 2.0 if tag in ['table', 'tr'] else 1.0
+                
+            # Se a tag for cosmética/hierárquica, sofre o Decaimento D-Rule ($ \gamma^{repetições} $)
+            else:
+                weight = self.gamma ** current_count
+                base_multiplier = 1.0
             
             bonus_score += (weight * base_multiplier)
             tag_counts[tag] += 1

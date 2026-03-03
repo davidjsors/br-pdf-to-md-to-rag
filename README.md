@@ -1,6 +1,6 @@
 [🇺🇸 English](README.en.md) | 🇧🇷 Português
 
-# br-pdf-to-md-to-rag
+# Transforme PDF em Markdown otimizado para o seu RAG
 
 Conversor de PDFs para Markdown estruturado, otimizado para ingestão em pipelines de RAG (Retrieval-Augmented Generation).
 

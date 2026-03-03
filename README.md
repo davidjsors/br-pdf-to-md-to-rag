@@ -16,16 +16,15 @@ Ferramentas generalistas abordam a conversão mapeando o conteúdo visual para o
 
 O **BR-PDF-to-MD** não extrai tudo "assim como está", mas sim aplicando uma camada super densa de limpeza (**cleaner semantic**) voltada unicamente à **sanitização em português pt-BR**.
 
-## ⚖️ O Comitê de Especialistas (Interleaved Ensemble)
+## ⚖️ O Comitê de Especialistas (Arquitetura de Orquestração v2)
 
-Não utilizamos apenas um motor, mas sim um **Comitê Orquestrado** que atua em 3 fases:
+Em vez de depender de um único motor, utilizamos **8 ferramentas lideradas por 4 Juízes** em etapas sequenciais:
 
-1.  **Fase de Identificação (O Radar)**: O *pdfplumber* varre cada página do PDF para identificar onde estão as áreas de tabelas e onde está o fluxo de texto.
-2.  **Fase de Delegação (Os Especialistas)**: 
-    *   **Prosa e Títulos**: O *Microsoft MarkItDown* é encarregado de reconstruir a narrativa, identificando `# Títulos` e `## Subtítulos` com precisão semântica.
-    *   **Grids e Dados**: O *pdfplumber* (nosso especialista em coordenadas) é encarregado de extrair as tabelas brasileiras com precisão absoluta.
-3.  **Fase de Reunião (A Síntese do Juiz)**: O Juiz Híbrido recebe as entregas de ambos e sintetiza um documento final robusto, injetando as tabelas de alta precisão no fluxo narrativo estruturado.
-
+1.  **Fase 0 (Radar)**: O *unstructured* varre a página e identifica as posições de parágrafos, tabelas e imagens.
+2.  **Etapa 1 (Narrativa)**: *MarkItDown* e *pymupdf4llm* reconstroem a prosa e a hierarquia de títulos. O Juiz Narrativo insere *âncoras* onde havia tabelas.
+3.  **Etapa 2 (Tabelas)**: *docling* (IBM) entende a semântica pesada das matrizes, enquanto o *pdfplumber* garante a precisão das coordenadas BR. (Só acionado se o Radar detectar tabelas).
+4.  **Etapa 3 (Visual)**: *marker-pdf* usa IA pesada para transformar layouts de imagem em Markdown, com *Tesseract OCR* como fallback rápido. (Só acionado se houver blocos de imagem).
+5.  **Etapa 4 (Síntese e Validação)**: O **Juiz Mestre** junta tudo. Ele substitui as âncoras da Etapa 1 pelas Tabelas da Etapa 2, aplica regras de filtragem BR (`cleaner.py`) e roda **obrigatoriamente** o algoritmo **MDEval** para aprovar a Saúde Estrutural final.
 ---
 
 ## 🌐 Como Acessar a Interface Web (Demo ao Vivo)

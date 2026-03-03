@@ -81,3 +81,20 @@ def calculate_structural_similarity(predicted_md: str, reference_md: str) -> flo
     
     # Ensure it's bounded between 0 and 1
     return max(0.0, min(1.0, similarity))
+
+class StructuralDensityEvaluator:
+    """
+    Avalia a saúde estrutural de um Markdown com base na riqueza de tags geradas.
+    Retorna um score de 0 a 100%.
+    """
+    def evaluate(self, md_content: str) -> float:
+        if not md_content or not md_content.strip():
+            return 0.0
+            
+        # Extrair tags HTML usando a lógica interna do MDEval
+        html_tags = extract_html_tags(markdown.markdown(normalize_math(md_content), extensions=['tables']))
+        
+        # Heurística que estava no app.py legado
+        structural_density = min(100.0, float(len(html_tags)) * 1.5) if len(html_tags) > 0 else 0.0
+        
+        return structural_density

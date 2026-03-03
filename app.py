@@ -4,7 +4,7 @@ import time
 import markdown
 from pathlib import Path
 
-from src.parser import process_pdf
+from src.orchestrator import process_pdf
 from src.metrics.eval_metrics import calculate_structural_similarity, extract_html_tags, normalize_math
 
 st.set_page_config(
@@ -54,36 +54,36 @@ if uploaded_file is not None:
             f.write(uploaded_file.getbuffer())
         
         start_time = time.time()
-        with st.spinner('O Juiz está avaliando as extrações dos especialistas... ⚖️⚙️'):
-            # Agora process_pdf retorna um dicionário com estatísticas do Ensemble
-            result = process_pdf(file_path, output_dir)
+        with st.spinner("⏳ O Comitê de Especialistas v2 está analisando seu documento... (Radar, Narrativa, Tabelas, Visão e Juiz Mestre em execução)"):
+            # Agora process_pdf retorna um OrchestratorResult
+            result = process_pdf(file_path)
                 
         duration = time.time() - start_time
             
-        if result.get("success"):
-            md_path = result["md_path"]
-            winner = result["winner"]
-            ensemble_stats = result["stats"]
+        if result.success:
+            md_content = result.final_markdown
+            md_path = output_dir / (uploaded_file.name.replace(".pdf", "") + ".md")
             
+            with open(md_path, "w", encoding="utf-8") as f:
+                f.write(md_content)
+                
             if md_path.exists():
-                with open(md_path, "r", encoding="utf-8") as f:
-                    md_content = f.read()
+                stats = result.stats
+                score = result.mdeval_score
+                tables_injected = stats.get("tables_injected", 0)
                 
-                # Estatísticas
-                num_chars = len(md_content)
-                num_tables = md_content.count("| --- |")
+                st.success(f"Concluído em **{duration:.2f}s**! ✨ Orquestração finalizada com sucesso.")
                 
-                html_tags = extract_html_tags(markdown.markdown(normalize_math(md_content), extensions=['tables']))
-                structural_density = min(100.0, float(len(html_tags)) * 1.5) if len(html_tags) > 0 else 0.0
-                
-                st.success(f"Concluído em {duration:.2f}s! ✨ Juiz escolheu: **{winner}**")
-                
-                # Layout de colunas para métricas (Visão Ensemble)
+                # Layout de colunas para métricas (Visão Quantitativa + Qualitativa)
                 m1, m2, m3, m4 = st.columns(4)
-                m1.metric("Páginas PDF", ensemble_stats.get("total_pages", 0))
-                m2.metric("Blocos de Texto", ensemble_stats.get("text_blocks_found", 0), help="Processados via MarkItDown.")
-                m3.metric("Tabelas Injetadas", ensemble_stats.get("tables_identified", 0), help="Tabelas de alta precisão extraídas via pdfplumber.")
-                m4.metric("Saúde Estrutural", f"{structural_density:.0f}%", help="Score MDEval: Riqueza de tags Markdown no arquivo final.")
+                
+                # Resumo Estatístico Requisitado pelo Usuário
+                m1.metric("Páginas Lidas", stats.get("total_pages", 0), help="Extensão detectada pelo Radar Espacial.")
+                m2.metric("Caracteres (Volume)", f"{len(md_content):,}", help="Volume bruto final do Markdown convertido.")
+                m3.metric("Tabelas/Imagens", f'{stats.get("tables_injected", 0)} / {stats.get("visual_blocks", 0)}', help="Matrizes e Fragmentos visuais consolidados.")
+                m4.metric("Saúde Estrutural", f"{score:.0f}%", help="Validação MDEval pelo Juiz Mestre (percentual de tags).")
+
+                st.info(f"🏆 **Motores Vencedores (Comitê):** Narrativa: `{stats.get('narrative_winner', 'N/A')}` | Matrizes: `{stats.get('data_winner', 'N/A')}` | Visão: `{stats.get('vision_winner', 'N/A')}`")
 
                 st.divider()
                 
@@ -109,9 +109,9 @@ if uploaded_file is not None:
                     type="primary"
                 )
             else:
-                st.error("Erro interno: o arquivo MD não foi gerado.")
+                st.error("Erro interno: o arquivo MD não foi salvo no servidor.")
         else:
-            st.error(f"Erro no processamento: {result.get('error', 'Erro desconhecido')}")
+            st.error(f"Erro Crítico do Orquestrador: {result.error}")
 else:
     # Boas vindas/Placeholder
     st.info("Aguardando upload do PDF para aplicar o motor Ensemble... 🚀")

@@ -10,6 +10,10 @@ def clean_text_block(text: str) -> str:
     # 1. Remove markers de quebra de página (\x0c ou \f)
     text = text.replace('\x0c', '').replace('\f', '')
 
+    # 1a. Limpa resíduos de HTML de extração de tabelas (como o <br> que você viu)
+    text = re.sub(r'<br\s*/?>', ' ', text, flags=re.IGNORECASE)
+    text = re.sub(r'</?span[^>]*>', '', text, flags=re.IGNORECASE) # Remove spans inúteis
+
     # 2. Remove paginação (Página 1 de 10, pg. 5, etc)
     text = re.sub(r'(?i)(?:p[áa]gina|pg\.?)\s*\d+(?:\s?de\s?\d+)?', '', text)
 

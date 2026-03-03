@@ -58,7 +58,8 @@ def synthesize_master(
     print("[Juiz Mestre] Acoplando metadados estruturais para RAG (Frontmatter YAML)...")
     from datetime import datetime
     original_filename = narrative_res.metadata.get("filename", "documento_extraido.pdf").replace(".pdf", "")
-    safe_title = re.sub(r'[^A-Za-z0-9_ -]', '', original_filename)
+    # Permitir letras acentuadas no título para o David
+    safe_title = re.sub(r'[^A-Za-zÀ-Úà-ú0-9_ -]', '', original_filename)
     
     frontmatter = (
         "---\n"

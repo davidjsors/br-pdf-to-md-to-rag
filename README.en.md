@@ -1,6 +1,6 @@
 🇺🇸 English | [🇧🇷 Português](README.md)
 
-# br-pdf-to-md-to-rag
+# Transform PDF into Markdown optimized for your RAG
 
 Converter for Brazilian PDFs (government, technical, and corporate documents) to structured Markdown, optimized for ingestion into RAG (Retrieval-Augmented Generation) pipelines.
 
@@ -33,7 +33,9 @@ The project uses a sequentially orchestrated extraction pipeline, where each com
 
 ## Structural Health Evaluator (MDEval)
 
-The core technical differentiator of this project is the Markdown quality evaluation system, implemented in `src/metrics/eval_metrics.py`. Inspired by the paper _MDEval: Evaluating Markdown Awareness of Large Language Models_ (SWUFE-DB-Group, WWW '25), the evaluator operates without a reference ground truth (Reference-Free):
+The core technical differentiator of this project is the Markdown quality evaluation system, implemented in `src/metrics/eval_metrics.py`. Inspired by the paper 
+[MDEval: Evaluating Markdown Awareness of Large Language Models](https://doi.org/10.48550/arXiv.2501.15000)
+(SWUFE-DB-Group, WWW '25), the evaluator operates without a reference ground truth (Reference-Free):
 
 1. **HTMLifying:** The Markdown is rendered as temporary HTML to separate textual content from the structural skeleton (`<table>`, `<h1>`, `<ul>`).
 2. **RAG-Relevance Weights:** Structured data tags (`table`, `tr`, `td`) receive a weight of 25. Lists (`ul`, `li`) receive a weight of 10. Headings (`h1`-`h6`) receive a weight of 5. Formatting tags (`b`, `i`, `strong`) receive a weight of 1.
@@ -123,12 +125,11 @@ if result.success:
 
 ## References
 
-- MDEval-Benchmark (SWUFE-DB-Group, WWW '25) — theoretical basis for the structural evaluator.
+- MDEval-Benchmark ([SWUFE-DB-Group](https://github.com/SWUFE-DB-Group/MDEval-Benchmark)) — theoretical basis for the structural evaluator.
 
 ## Governance
 
-This repository is developed in pair with AI agents. Infrastructure rule: no autonomous agent is authorized to execute `git commit` or `git push` without explicit permission from the responsible engineer.
-
+This repository is developed in pair with AI agents.
 ## License
 
 [MIT](LICENSE)

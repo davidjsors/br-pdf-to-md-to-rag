@@ -39,11 +39,11 @@ with st.sidebar:
 st.title("BR-PDF-to-MD-to-RAG 🇧🇷📄")
 st.markdown("#### Conversor e Limpador de PDFs brasileiros para Markdown otimizado para RAG")
 
+uploaded_file = st.file_uploader("Arraste ou selecione seu PDF aqui", type=["pdf"])
+
 tab_prod, tab_arena = st.tabs(["🚀 Conversor (Produção)", "⚔️ Arena de Benchmark"])
 
 with tab_prod:
-    uploaded_file = st.file_uploader("Arraste ou selecione seu PDF aqui", type=["pdf"])
-
     if uploaded_file is not None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_dir_path = Path(temp_dir)
@@ -140,10 +140,9 @@ with tab_arena:
     | **MDEval** | Validação (4)| Auditor final matemático que converte e compara as tags estruturais injetadas. |
     """)
     
-    uploaded_arena = st.file_uploader("Arraste seu PDF para a Arena de Batalha", type=["pdf"], key="arena_upload")
-    
-    if uploaded_arena is not None:
-        if st.button("🥊 Iniciar Batalha de Benchmark", type="primary"):
+    # Removeremos o uploader separado e usaremos o global
+    if uploaded_file is not None:
+        if st.button("🥊 Iniciar Batalha de Benchmark neste Documento", type="primary"):
             from src.metrics.eval_metrics import StructuralDensityEvaluator
             from src.specialists.narrative_markitdown import extract_narrative_markitdown
             from src.specialists.narrative_pymupdf import extract_narrative_pymupdf
@@ -167,9 +166,9 @@ with tab_arena:
             evaluator = StructuralDensityEvaluator()
             
             with tempfile.TemporaryDirectory() as temp_dir:
-                file_path = Path(temp_dir) / uploaded_arena.name
+                file_path = Path(temp_dir) / uploaded_file.name
                 with open(file_path, "wb") as f:
-                    f.write(uploaded_arena.getbuffer())
+                    f.write(uploaded_file.getbuffer())
                     
                 resultados = []
                 

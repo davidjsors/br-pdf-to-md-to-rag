@@ -93,13 +93,13 @@ if uploaded_file is not None:
                     
                     col1, col2 = st.columns(2)
                     with col1:
-                        st.markdown("**👀 Renderizado (Preview)**")
-                        with st.container(height=400, border=True):
-                            st.markdown(md_content)
-                    with col2:
                         st.markdown("**📝 Código Fonte (Markdown)**")
                         with st.container(height=400, border=True):
                             st.code(md_content, language="markdown")
+                    with col2:
+                        st.markdown("**👀 Renderizado (Preview)**")
+                        with st.container(height=400, border=True):
+                            st.markdown(md_content)
                             
                     st.divider()
                     

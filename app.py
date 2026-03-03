@@ -2,6 +2,7 @@ import streamlit as st
 import tempfile
 import time
 import markdown
+import base64
 from pathlib import Path
 
 from src.orchestrator import process_pdf
@@ -94,20 +95,28 @@ if uploaded_file is not None:
                         body_content = md_content
 
                     with col1:
-                        # Toolbar de Ações Customizada (Minimalista)
-                        t_col, b_col1, b_col2 = st.columns([0.7, 0.1, 0.1])
+                        # Toolbar de Ações Minimalista (HTML/JS)
+                        t_col, a_col = st.columns([0.6, 0.4])
                         t_col.markdown("**📝 Código Fonte**")
                         
-                        # Botões de Ícone Compactos
-                        # Nota: st.code já tem um botão de cópia nativo, mas colocamos este por redundância estética
-                        b_col1.button("📋", help="Cópia rápida disponível no bloco", disabled=True)
-                        b_col2.download_button(
-                            label="📥",
-                            data=md_content,
-                            file_name=md_path.name,
-                            mime="text/markdown",
-                            help="Baixar Markdown RAG-Ready",
-                        )
+                        # Botões minimalistas injetados via HTML para controle total de estilo
+                        md_b64 = base64.b64encode(md_content.encode()).decode()
+                        actions_html = f"""
+                        <div style="display: flex; justify-content: flex-end; gap: 10px; padding-top: 5px;">
+                            <button onclick="navigator.clipboard.writeText(`{md_content.replace('`', '\\`').replace('$', '\\$')}`)" 
+                                    title="Copiar Markdown"
+                                    style="background: #262730; border: 1px solid #444; border-radius: 4px; cursor: pointer; padding: 4px 8px; color: #fafafa; font-size: 16px; transition: 0.3s;">
+                                📋
+                            </button>
+                            <a href="data:text/markdown;base64,{md_b64}" download="{md_path.name}" 
+                               title="Baixar Markdown"
+                               style="background: #262730; border: 1px solid #444; border-radius: 4px; cursor: pointer; padding: 4px 8px; color: #fafafa; font-size: 16px; text-decoration: none; display: flex; align-items: center; transition: 0.3s;">
+                                📥
+                            </a>
+                        </div>
+                        """
+                        with a_col:
+                            st.components.v1.html(actions_html, height=45)
                         
                         with st.container(height=500, border=True):
                             st.code(md_content, language="markdown")

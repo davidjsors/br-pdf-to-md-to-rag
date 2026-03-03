@@ -15,8 +15,8 @@ from src.metrics.eval_metrics import calculate_structural_similarity, extract_ht
 # Página: Configuração e Estilo Global
 # ---------------------------------------------------------------------------
 st.set_page_config(
-    page_title="Transforme PDF em Markdown",
-    page_icon="📄",
+    page_title="BR PDF to MD to RAG",
+    page_icon="assets/pdf_icon.png",
     layout="wide",
 )
 

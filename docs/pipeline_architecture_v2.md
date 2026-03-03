@@ -19,12 +19,19 @@ PDF → Radar Espacial → Narrativa → Tabelas → Síntese → Markdown RAG-R
 
 O Radar analisa cada página do PDF e constrói um `DocumentManifest` contendo a classificação de zonas detectadas (texto, tabela, imagem, cabeçalho, rodapé).
 
-**Funcionamento:**
-- O motor `unstructured` realiza a classificação semântica primária das zonas, identificando o tipo de cada elemento na página (NarrativeText, Table, Image, Title).
-- O `pdfplumber` atua como fallback geométrico, garantindo cobertura quando o `unstructured` não está disponível.
-- O manifesto resultante informa às etapas seguintes quais páginas contêm tabelas (acionando o Juiz de Dados) e quais contêm imagens (registrando para processamento futuros).
+**Orquestração complementar:** Cada motor contribui com sua especialidade:
 
-**Decisão de roteamento:** Se o Radar não detecta tabelas, o Juiz de Dados (Etapa 2) é acionado, mas retorna rapidamente ao não encontrar conteúdo tabular via `pdfplumber`.
+| Motor | Especialidade | Contribuição |
+|---|---|---|
+| `unstructured` | Classificação semântica | Identifica o **tipo** de cada elemento (NarrativeText, Table, Image, Title) via análise de layout. |
+| `pdfplumber` | Precisão geométrica | Enriquece o manifesto com **bounding boxes** e detecta tabelas/imagens nativas não capturadas. |
+
+**Fluxo de execução:**
+1. O `unstructured` processa o PDF e classifica semanticamente cada zona da página.
+2. O `pdfplumber` percorre as mesmas páginas e adiciona dados geométricos (coordenadas de imagens, detecção nativa de tabelas) ao manifesto já classificado.
+3. Se o `unstructured` não estiver disponível, o `pdfplumber` opera isoladamente no modo geométrico.
+
+**Decisão de roteamento:** O manifesto resultante informa às etapas seguintes quais páginas contêm tabelas (acionando o Juiz de Dados) e quais contêm imagens.
 
 ---
 

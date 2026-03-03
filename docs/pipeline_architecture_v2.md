@@ -105,7 +105,7 @@ Validador determinístico que mede:
 
 ---
 
-## Limpeza Léxica PT-BR
+## Limpeza Léxica
 
 **Arquivo:** `src/cleaner.py`
 
@@ -122,7 +122,7 @@ Módulo de heurísticas para remoção de artefatos específicos de documentos b
 ```
 src/
 ├── orchestrator.py          # Coordenador central da pipeline
-├── cleaner.py               # Filtros morfológicos PT-BR
+├── cleaner.py               # Filtros morfológicos
 ├── formatter.py             # Conversor tabela → Markdown
 ├── models.py                # Modelos de dados (Manifesto, Zonas, Resultados)
 ├── radar/

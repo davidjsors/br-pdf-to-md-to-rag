@@ -45,8 +45,8 @@ def synthesize_master(
         for v_block in vision_res.visuals:
             master_text += f"{v_block}\n\n"
 
-    # 3. Passar pelo Cleaner Semântico (Lixeira PT-BR)
-    print("[Juiz Mestre] Aplicando Filtros Morfológicos (PT-BR)...")
+    # 3. Passar pelo Cleaner Semântico (Lixeira)
+    print("[Juiz Mestre] Aplicando Filtros Morfológicos...")
     final_output = clean_text_block(master_text)
 
     # 4. Validador Obrigatório MDEval

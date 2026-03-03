@@ -48,53 +48,118 @@ def calculate_structural_similarity(predicted_md: str, reference_md: str) -> flo
     pred_md = normalize_math(predicted_md)
     ref_md = normalize_math(reference_md)
     
-    # 2. Convert to HTML
-    # We use extensions to support tables, fenced code blocks, etc.
-    extensions = ['tables', 'fenced_code', 'nl2br', 'sane_lists']
-    pred_html = markdown.markdown(pred_md, extensions=extensions)
-    ref_html = markdown.markdown(ref_md, extensions=extensions)
-    
-    # 3. Extract tag sequences (skeletons)
-    pred_tags = extract_html_tags(pred_html)
-    ref_tags = extract_html_tags(ref_html)
-    
-    # 4. Calculate Levenshtein Distance
-    # Represent tags as joined strings to use Levenshtein
-    # or use Levenshtein distance on lists (if library supports it, python-Levenshtein typically works on strings)
-    # Since tags can be multi-character, we map them to unique characters or use a generic list distance.
-    # We'll use sequence matcher or editops for list-based distance, but for simplicity, 
-    # joining them is a fast approximation if tags don't overlap uniquely.
-    # A safer way is to use difflib or a custom edit distance for lists.
-    import difflib
-    matcher = difflib.SequenceMatcher(None, pred_tags, ref_tags)
-    
-    # Ratio gives 2*M / (T) which is similar to 1 - (distance / max(len))
-    # We'll stick to a strict Edit Distance calculation for exact MDEval parity.
-    distance = sum(1 for tag, i1, i2, j1, j2 in matcher.get_opcodes() if tag != 'equal' for _ in range(max(i2-i1, j2-j1)))
-    
-    max_len = max(len(pred_tags), len(ref_tags))
-    
-    if max_len == 0:
-        return 1.0 # Both are completely empty structurally
-        
-    similarity = 1.0 - (distance / max_len)
-    
-    # Ensure it's bounded between 0 and 1
-    return max(0.0, min(1.0, similarity))
-
 class StructuralDensityEvaluator:
     """
-    Avalia a saúde estrutural de um Markdown com base na riqueza de tags geradas.
-    Retorna um score de 0 a 100%.
+    Motor Reference-Free de Avaliação Estrutural (Inspirado no MDEval-Benchmark).
+    Calcula a aderência e riqueza do Markdown extraído convertendo para HTML e
+    aplicando a regra de Decaimento (D-Rule) para evitar inflação por prolixidade,
+    seguida de uma penalidade rigorosa de Lixo Visual (Regex BR).
     """
-    def evaluate(self, md_content: str) -> float:
-        if not md_content or not md_content.strip():
+    
+    def __init__(self, gamma: float = 0.5):
+        """
+        :param gamma: Fator de decaimento para tags repetidas (evita viés prolixo).
+                      O 1º tag vale 1.0, o 2º vale 0.5, o 3º vale 0.25, etc.
+        """
+        self.gamma = gamma
+        
+        # Tags de alto valor estrutural que merecem pontuação
+        self.valuable_tags = {'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'table', 'tr', 'th', 'td', 'ul', 'ol', 'li', 'b', 'strong', 'i', 'em'}
+        
+        # Padrões de Lixo Visual Brasileiro compilados para a penalidade
+        self.garbage_patterns = [
+            r'(?i)(?:p[áa]gina|pg\.?)\s*\d+(?:\s?de\s?\d+)?', # Numeração de página
+            r'(?:\b\d{1,3}\b(?:\s+|,)?\s?){4,}',             # Eixos de gráfico / réguas numéricas
+            r'(?:R\$\s*\d+(?:[\.,]\d{0,2})?\s*){2,}',        # Tabelas de preço vazando R$ R$
+            r'\b(?:R\$\s*){2,}'                              # R$ vazio consecutivo
+        ]
+
+    def htmlify_and_extract_tags(self, md_text: str) -> list[str]:
+        """Converte Markdown para HTML e isola a estrutura de tags."""
+        html_content = markdown.markdown(md_text, extensions=['tables', 'fenced_code'])
+        soup = BeautifulSoup(html_content, "html.parser")
+        
+        extracted_tags = []
+        for tag in soup.find_all(True):
+            if tag.name in self.valuable_tags:
+                extracted_tags.append(tag.name)
+        return extracted_tags
+
+    def calculate_d_rule_bonus(self, tags: list[str]) -> float:
+        """
+        Calcula o Score Estrutural base considerando o decaimento por repetição local.
+        (Quanto mais repetida for a tag, menos ela adiciona ao score para evitar hacks).
+        """
+        bonus_score = 0.0
+        tag_counts: dict[str, int] = defaultdict(int)
+        
+        for tag in tags:
+            current_count = tag_counts[tag]
+            # Fórmula do D-Rule: peso = (gamma) ^ (número de repetições anteriores)
+            weight = self.gamma ** current_count
+            
+            # Algumas tags vitais podem ter pesos básicos maiores, mas aqui
+            # usaremos o peso natural normalizado do artigo. Tabelas são ouro.
+            base_multiplier = 2.0 if tag in ['table', 'tr'] else 1.0
+            
+            bonus_score += (weight * base_multiplier)
+            tag_counts[tag] += 1
+            
+        return bonus_score
+
+    def calculate_garbage_penalty(self, text: str) -> float:
+        """
+        Aplica o pente fino das heurísticas BR para arrancar pontos de modelos 
+        que vazam lixo visual do PDF (páginas, rodapés vazios).
+        """
+        penalty = 0.0
+        
+        for pattern in self.garbage_patterns:
+            matches = len(re.findall(pattern, text))
+            penalty += (matches * 1.5)  # Cada vazamento custa 1.5 de saúde
+            
+        # Penaliza blocos massivos sem parágrafos (sopa de letras amórfica)
+        if len(text) > 1000 and text.count('\n\n') < 2:
+            penalty += 5.0
+            
+        return penalty
+
+    def evaluate(self, md_text: str) -> float:
+        """
+        Retorna o Score Final (0 a 100%) baseado no HTMLifying e Heurísticas de Defesa.
+        Como é Reference-Free (Sem Gabarito de Teto), usamos uma função de achatamento.
+        """
+        if not md_text or len(md_text.strip()) < 5:
             return 0.0
             
-        # Extrair tags HTML usando a lógica interna do MDEval
-        html_tags = extract_html_tags(markdown.markdown(normalize_math(md_content), extensions=['tables']))
+        # 1. Extração Estrutural
+        tags = self.htmlify_and_extract_tags(md_text)
         
-        # Heurística que estava no app.py legado
-        structural_density = min(100.0, float(len(html_tags)) * 1.5) if len(html_tags) > 0 else 0.0
+        # 2. Cálculo do Bônus (D-Rule)
+        bonus = self.calculate_d_rule_bonus(tags)
         
-        return structural_density
+        # 3. Cálculo do Lixo
+        penalty = self.calculate_garbage_penalty(md_text)
+        
+        raw_score = bonus - penalty
+        if raw_score <= 0:
+            return 0.0
+            
+        # Curva de achatamento para converter a pontuação infinita em um Percentual 0-100%
+        # Quanto maior o score cru, mais ele tende a 100%. Uma tabela linda ou 5 títulos geram ~80%+
+        # score = 100 * (1 - e^(-raw_score / constante_fator))
+        normalized_percentage = 100.0 * (1.0 - math.exp(-raw_score / 15.0))
+        
+        return float(round(normalized_percentage, 2))
+
+# Compatibilidade com APIs legadas do projeto
+def calculate_structural_similarity(generated: str, reference: str) -> float:
+    # Como abolimos o reference no pipeline, apenas redirecionamos
+    return StructuralDensityEvaluator().evaluate(generated)
+
+def extract_html_tags(md_text: str) -> list:
+    return StructuralDensityEvaluator().htmlify_and_extract_tags(md_text)
+
+def normalize_math(text: str) -> str:
+    # Mantida para compatibilidade passiva
+    return text

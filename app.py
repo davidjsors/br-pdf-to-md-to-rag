@@ -111,8 +111,21 @@ if uploaded_file is not None:
                         st.markdown("**👀 Renderizado (Preview)**")
                         with st.container(height=500, border=True):
                             if yaml_data:
-                                with st.expander("📊 Metadados e Score RAG", expanded=False):
-                                    st.code(yaml_data, language="yaml")
+                                import yaml
+                                try:
+                                    meta = yaml.safe_load(yaml_data)
+                                    # Cabeçalho Visual de Metadados
+                                    st.markdown(f"#### {meta.get('title', 'Documento Extraído')}")
+                                    m1, m2, m3 = st.columns(3)
+                                    m1.metric("Score RAG", f"{meta.get('mdeval_score', 0)}%")
+                                    m2.metric("Tabelas", meta.get('tables_injected', 0))
+                                    m3.metric("Chars", meta.get('total_characters', 0))
+                                    st.caption(f"📅 {meta.get('processing_date', '')} | 📂 {meta.get('source_file', 'N/A')}")
+                                    st.divider()
+                                except Exception:
+                                    with st.expander("📊 Metadados Brutos"):
+                                        st.code(yaml_data, language="yaml")
+                            
                             st.markdown(body_content)
                             
                     st.divider()

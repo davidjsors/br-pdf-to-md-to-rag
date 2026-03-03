@@ -94,15 +94,15 @@ if uploaded_file is not None:
                         body_content = md_content
 
                     with col1:
-                        # Cabeçalho compacto com Download
-                        c1, c2 = st.columns([0.8, 0.2])
-                        c1.markdown("**📝 Código Fonte (Markdown)**")
-                        c2.download_button(
+                        # Toolbar ultra-compacta
+                        h1, h2 = st.columns([0.9, 0.1])
+                        h1.markdown("**📝 Código Fonte (Markdown)**")
+                        h2.download_button(
                             label="📥",
                             data=md_content,
                             file_name=md_path.name,
                             mime="text/markdown",
-                            help="Baixar Markdown RAG-Ready"
+                            help="Baixar Markdown",
                         )
                         with st.container(height=500, border=True):
                             st.code(md_content, language="markdown")

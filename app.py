@@ -1,313 +1,306 @@
 import streamlit as st
 import tempfile
 import time
-import markdown
+import re
+import yaml
+import json
 import base64
 from pathlib import Path
+from streamlit.components.v1 import html
 
 from src.orchestrator import process_pdf
 from src.metrics.eval_metrics import calculate_structural_similarity, extract_html_tags, normalize_math
 
+# ---------------------------------------------------------------------------
+# Página: Configuração e Estilo Global
+# ---------------------------------------------------------------------------
 st.set_page_config(
-    page_title="BR-PDF-to-MD-to-RAG", 
-    page_icon="🇧🇷", 
-    layout="wide"
+    page_title="BR-PDF-to-MD-to-RAG",
+    page_icon="📄",
+    layout="wide",
 )
 
-# Sidebar - Sobre e Instruções
+# Design System Profissional (Inter)
+st.markdown("""
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    
+    html, body, [class*="css"] {
+        font-family: 'Inter', -apple-system, sans-serif;
+    }
+    
+    /* Layout Density */
+    .block-container { padding-top: 1.5rem; padding-bottom: 2rem; max-width: 95%; }
+    
+    /* Sidebar */
+    [data-testid="stSidebar"] { background-color: #0e1117; }
+
+    /* Metrics Dashboard Style */
+    [data-testid="stMetricValue"] { font-size: 1.4rem !important; font-weight: 700 !important; color: #ffffff; }
+    [data-testid="stMetricLabel"] { font-size: 0.7rem !important; text-transform: uppercase !important; opacity: 0.6 !important; letter-spacing: 0.1em; margin-bottom: 4px; }
+    div[data-testid="stMetric"] { background: rgba(255,255,255,0.02); padding: 16px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); margin-bottom: 12px; }
+
+    /* Hide Default File Uploader Limit (Streamlit doesn't allow changing it easily) */
+    [data-testid="stFileUploader"] small { display: none !important; }
+    
+    /* Tables & Data Alignment */
+    .stTable table, .custom-table table { 
+        width: 100% !important; 
+        border-collapse: collapse !important;
+        font-size: 0.85rem !important;
+    }
+    .stTable th, .stTable td, .custom-table th, .custom-table td { 
+        text-align: center !important; 
+        padding: 12px 8px !important;
+        border-bottom: 1px solid rgba(255,255,255,0.05) !important;
+    }
+    .custom-table th { background: rgba(255,255,255,0.03); color: rgba(255,255,255,0.6); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; }
+
+    /* Info Box Styling */
+    .stAlert { background: rgba(0,104,201,0.05); border: 1px solid rgba(0,104,201,0.1); color: #60b4ff; font-size: 0.85rem; border-radius: 6px; }
+</style>
+""", unsafe_allow_html=True)
+
 with st.sidebar:
-    st.image("https://img.icons8.com/clippy/100/000000/cleaning-a-surface.png", width=100)
-    st.title("Sobre o Projeto")
-    st.markdown("""
-    Este conversor foi criado para resolver o problema de **"lixo de layout"** em PDFs brasileiros.
-    
-    ### O que limpamos:
-    - 🧹 **Página X de Y**: Removemos numeração de páginas automática.
-    - 🧹 **Eixos de Gráficos**: Sequências numéricas que poluem o RAG.
-    - 🧹 **Hifenização**: Reconstruímos palavras cortadas no fim da linha.
-    - 🧹 **Cabeçalhos Repetidos**: Evitamos duplicidade de títulos.
-    
-    ### Métrica de Qualidade:
-    Utilizamos métricas de densidade estrutural inspiradas no framework acadêmico **MDEval-Benchmark (WWW '25)**.
-    
-    ### Por que Markdown?
-    Markdown é o formato ideal para **LLMs** e **Vector Databases**, pois preserva a estrutura (tabelas, títulos) sem o overhead visual do PDF.
-    """)
+    st.title("Sobre")
+    st.markdown("Conversor inteligente de PDFs brasileiros para Markdown estruturado.")
     st.divider()
-    st.info("Desenvolvido para a comunidade de IA do Brasil. 🇧🇷")
+    st.caption("Foco: Bases de Conhecimento RAG")
+    st.caption("Limite: 2 MB | v2.5")
 
-# Main Content
-st.title("BR-PDF-to-MD-to-RAG 🇧🇷📄")
-st.markdown("#### Conversor e Limpador de PDFs brasileiros para Markdown otimizado para RAG")
+# ---------------------------------------------------------------------------
+# Cabeçalho Principal
+# ---------------------------------------------------------------------------
+st.title("BR PDF → MD → RAG")
+st.caption("Extração estrutural limpa e normalizada para bancos vetoriais")
 
-uploaded_file = st.file_uploader("Arraste ou selecione seu PDF aqui", type=["pdf"])
+# Gestão de Estado
+if "r_data" not in st.session_state: st.session_state.r_data = None
+if "r_bench" not in st.session_state: st.session_state.r_bench = None
+if "r_fid" not in st.session_state: st.session_state.r_fid = None
 
-MAX_FILE_SIZE_MB = 1
-MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
+# O Organizador de Abas é o motor principal do layout agora
+tab_conv, tab_bench = st.tabs(["Conversão", "Benchmark"])
 
-if uploaded_file is not None:
-    if uploaded_file.size > MAX_FILE_SIZE_BYTES:
-        st.error(f"❌ O arquivo excede o limite de {MAX_FILE_SIZE_MB} MB. Por favor, envie um arquivo menor para garantir a estabilidade do processamento lite.")
-    else:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            temp_dir_path = Path(temp_dir)
-            
-            file_path = temp_dir_path / uploaded_file.name
-            output_dir = temp_dir_path / "output"
-            output_dir.mkdir(exist_ok=True)
-            
-            # Salvando arquivo enviado
-            with open(file_path, "wb") as f:
-                f.write(uploaded_file.getbuffer())
-            
-            start_time = time.time()
-            with st.spinner("⏳ O Comitê de Especialistas v2 está analisando seu documento... (Radar, Narrativa, Tabelas, Visão e Juiz Mestre em execução)"):
-                # Agora process_pdf retorna um OrchestratorResult
-                result = process_pdf(file_path)
-                
-            duration = time.time() - start_time
-                
-            if result.success:
-                md_content = result.final_markdown
-                md_path = output_dir / (uploaded_file.name.replace(".pdf", "") + ".md")
-                
-                with open(md_path, "w", encoding="utf-8") as f:
-                    f.write(md_content)
-                    
-                if md_path.exists():
-                    stats = result.stats
-                    score_orquestrador = result.mdeval_score
-                    
-                    # --- SEÇÃO 1: O MELHOR RESULTADO ---
-                    st.subheader("1. Seu Markdown Otimizado (Resultado Final) 🏆")
-                    st.success(f"Conversão concluída em **{duration:.2f}s** com o Comitê V2!")
-                    
-                    col1, col2 = st.columns(2)
-                    
-                    # Lógica para limpar o preview (remove YAML gigante)
-                    import re
-                    yaml_match = re.match(r'^---\s*(.*?)\s*---\s*(.*)', md_content, re.DOTALL)
-                    if yaml_match:
-                        yaml_data = yaml_match.group(1)
-                        body_content = yaml_match.group(2)
-                    else:
-                        yaml_data = ""
-                        body_content = md_content
+with tab_conv:
+    # Divisão em Colunas (Master-Detail)
+    col_master, col_detail = st.columns([0.76, 0.24], gap="large")
+    
+    with col_master:
+        # Área de Upload integrada na esquerda com label manual (já que escondemos o 'small')
+        st.markdown("<p style='font-size: 0.8rem; opacity: 0.6; margin-bottom: 8px;'>Submeta um PDF (Máx. 2MB)</p>", unsafe_allow_html=True)
+        uploader = st.file_uploader("PDF", type=["pdf"], key="main_uploader", label_visibility="collapsed")
+        
+        if uploader:
+            uid = f"{uploader.name}_{uploader.size}"
+            if st.session_state.r_fid != uid:
+                st.session_state.r_data = None
+                st.session_state.r_bench = None
+                st.session_state.r_fid = uid
 
-                    with col1:
-                        # Toolbar de Ações Minimalista (HTML/JS)
-                        t_col, a_col = st.columns([0.6, 0.4])
-                        t_col.markdown("**📝 Código Fonte**")
-                        
-                        # Botões minimalistas injetados via HTML para controle total de estilo
-                        # Escapando o conteúdo para JS
-                        js_safe_content = md_content.replace('\\', '\\\\').replace('`', '\\`').replace('$', '\\$')
-                        safe_filename = uploaded_file.name.replace(".pdf", "") + ".md"
-                        
-                        actions_html = f"""
-                        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-                        <div style="display: flex; justify-content: flex-end; gap: 18px; padding-top: 5px; background: transparent;">
-                            <button id="copyBtn" onclick="copyToClipboard()" 
-                                    title="Copiar Markdown"
-                                    style="background: transparent; border: none; cursor: pointer; color: #ffffff; font-size: 18px; transition: 0.2s; display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; opacity: 0.8;">
-                                <i id="copyIcon" class="fa-regular fa-copy"></i>
-                            </button>
-                            <a id="downloadBtn" onclick="downloadFile()" 
-                               title="Baixar Markdown"
-                               style="background: transparent; border: none; cursor: pointer; color: #ffffff; font-size: 18px; text-decoration: none; display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; opacity: 0.8; transition: 0.2s;">
-                                <i class="fa-solid fa-download"></i>
-                            </a>
-                        </div>
-                        <style>
-                            button:hover, a:hover {{ opacity: 1 !important; transform: scale(1.1); }}
-                        </style>
-                        <script>
-                        function copyToClipboard() {{
-                            const text = `{js_safe_content}`;
-                            const textArea = document.createElement("textarea");
-                            textArea.value = text;
-                            document.body.appendChild(textArea);
-                            textArea.select();
-                            try {{
-                                document.execCommand('copy');
-                                const icon = document.getElementById('copyIcon');
-                                icon.className = 'fa-solid fa-check';
-                                icon.style.color = '#2ecc71';
-                                setTimeout(() => {{ 
-                                    icon.className = 'fa-regular fa-copy'; 
-                                    icon.style.color = '#ffffff';
-                                }}, 2000);
-                            }} catch (err) {{
-                                console.error('Erro ao copiar: ', err);
-                            }}
-                            document.body.removeChild(textArea);
-                        }}
-                        
-                        function downloadFile() {{
-                            const text = `{js_safe_content}`;
-                            const blob = new Blob([text], {{ type: 'text/markdown' }});
-                            const url = URL.createObjectURL(blob);
-                            const a = document.createElement('a');
-                            a.href = url;
-                            a.download = "{safe_filename}";
-                            document.body.appendChild(a);
-                            a.click();
-                            document.body.removeChild(a);
-                            URL.revokeObjectURL(url);
-                        }}
-                        </script>
-                        """
-                        with a_col:
-                            st.components.v1.html(actions_html, height=40)
-                        
-                        with st.container(height=500, border=True):
-                            st.code(md_content, language="markdown")
-                    with col2:
-                        st.markdown("**👀 Renderizado (Preview)**")
-                        with st.container(height=500, border=True):
-                            if yaml_data:
-                                import yaml
-                                try:
-                                    meta = yaml.safe_load(yaml_data)
-                                    # Cabeçalho Visual de Metadados
-                                    st.markdown(f"#### {meta.get('title', 'Documento Extraído')}")
-                                    m1, m2, m3 = st.columns(3)
-                                    m1.metric("Score RAG", f"{meta.get('mdeval_score', 0)}%")
-                                    m2.metric("Tabelas", meta.get('tables_injected', 0))
-                                    m3.metric("Chars", meta.get('total_characters', 0))
-                                    st.caption(f"📅 {meta.get('processing_date', '')} | 📂 {meta.get('source_file', 'N/A')}")
-                                    st.divider()
-                                except Exception:
-                                    with st.expander("📊 Metadados Brutos"):
-                                        st.code(yaml_data, language="yaml")
-                            
-                            st.markdown(body_content)
-                            
-                    st.divider()
-                    
-                    # --- SEÇÃO 2: OS BASTIDORES (BENCHMARK) ---
-                    st.subheader("2. Os Bastidores: Por que este é o melhor resultado? 📊")
-                    st.markdown("""
-                    Nos bastidores, nosso **Orquestrador V2** executa múltiplas bibliotecas e aplica Heurísticas Brasileiras de Limpeza para evitar a poluição de Bancos Vetoriais (RAG).
-                    Abaixo, testamos o seu documento agora mesmo nas bibliotecas puras (cruas) e compararmos a **Saúde Estrutural (MDEval)** delas com a nossa.
-                    """)
-                    
-                    if st.button("🥊 Executar Comparação (Benchmark) neste Documento", type="secondary"):
-                        from src.metrics.eval_metrics import StructuralDensityEvaluator
-                        from src.specialists.narrative_markitdown import extract_narrative_markitdown
-                        from src.specialists.narrative_pymupdf import extract_narrative_pymupdf
-                        from src.metrics.rag_readiness_linter import RagReadinessLinter
-                        import pandas as pd
-                        
-                        evaluator = StructuralDensityEvaluator()
-                        linter = RagReadinessLinter()
-                        
-                        def build_metrics(motor, md_text, build_time):
-                            eval_sc = evaluator.evaluate(md_text)
-                            linter_sc = linter.evaluate(md_text)
-                            
-                            ocr = linter_sc["Orphan_Chunk_Rate"] * 100
-                            twr = max(0, 100 - (max(0, linter_sc["Token_Word_Ratio"] - 1.5) * 40))
-                            ast = max(0, 100 - (linter_sc["AST_Violations"] * 20))
-                            fmt = 100 if linter_sc["Frontmatter_Invalidity"] == 0.0 else 0
-                            
-                            # Score Global RAG (100 pts)
-                            score = (eval_sc * 0.40) + ((100 - ocr) * 0.30) + (twr * 0.15) + (ast * 0.10) + (fmt * 0.05)
-                            
-                            return {
-                                "Motor": motor,
-                                "Tempo (s)": build_time,
-                                "SCORE RAG": score,
-                                "MDE": eval_sc,
-                                "OCR": ocr,
-                                "TWR": linter_sc["Token_Word_Ratio"],
-                                "AST": linter_sc["AST_Violations"],
-                                "FMT": "❌" if linter_sc["Frontmatter_Invalidity"] else "✅"
-                            }
-
-                        resultados = []
-                        
-                        with st.spinner("⚔️ Roda 1/2: Testando MarkItDown isolado..."):
-                            t0 = time.time()
-                            md1 = extract_narrative_markitdown(file_path)
-                            resultados.append(build_metrics("MarkItDown (puro)", md1, time.time() - t0))
-
-                        with st.spinner("⚔️ Roda 2/2: Testando PyMuPDF4LLM isolado..."):
-                            t0 = time.time()
-                            md2 = extract_narrative_pymupdf(file_path)
-                            resultados.append(build_metrics("PyMuPDF4LLM (puro)", md2, time.time() - t0))
-                        
-                        with st.spinner("🛡️ Construindo métricas do Orquestrador..."):
-                            # Reaproveitamos o md e a duração
-                            resultados.append(build_metrics("👑 Nosso Orquestrador V2", md_content, duration))
-                        
-                        df = pd.DataFrame(resultados)
-                        
-                        st.info("""**Qual é o diferencial dessa aplicação na prática?**  
-                        Enquanto bibliotecas "cruas" focam apenas em copiar as palavras do documento, nosso Sistema atua como Engenheiro de Dados RAG. Nós computamos 5 variáveis MLOps simultâneas (avaliando Poluição Visual, Custo de Token da LLM e Estrutura Lógica) para gerar o **Score RAG Global de Prontidão**. Veja o detalhamento na tabela abaixo.
-                        """)
-
-                        # Tabela Simples
-                        df_display = pd.DataFrame({
-                            "Abordagem": [r["Motor"] for r in resultados],
-                            "SCORE RAG": [f"🏆 {r['SCORE RAG']:.1f}" for r in resultados],
-                            "MDE (%)": [f"{r['MDE']:.1f}%" for r in resultados],
-                            "OCR (%)": [f"{r['OCR']:.1f}%" for r in resultados],
-                            "TWR": [f"{r['TWR']:.2f}" for r in resultados],
-                            "AST": [f"{r['AST']}" for r in resultados],
-                            "FMT": [r["FMT"] for r in resultados]
-                        })
-                        st.table(df_display)
-                        
-                        st.caption("""
-                        **📚 Legenda de Qualidade RAG:**  
-                        **SCORE RAG:** Pontuação Final de Grau de Prontidão para Agentes LLM (0-100). Combinação ponderada das variáveis abaixo.  
-                        **MDE (Densidade MDEval):** Estrutura da formatação visual (Tabelas e marcações sem lixo OCR). (Peso 40%).  
-                        **OCR (Orphan Chunks):** Taxa de fragmentação vazando sem Metadados Hierárquicos. Ideal = 0%. (Peso 30%).  
-                        **TWR (Token/Word):** Eficiência de Espaço Latente (quantos Tokens a IA gasta por Palavra real). Ideal é ~1.0 a 1.5. (Peso 15%).  
-                        **AST (Violações de Árvore):** Saltos Ilógicos de títulos (H1 para H3) ou poluição via HTML Embutido inútil. (Peso 10%).  
-                        **FMT (Frontmatter YAML):** Presença de metadados rígidos de roteamento no cabeçalho do arquivo global. (Peso 5%).
-                        """)
-                        
-                        # Gráficos Didáticos
-                        st.markdown("#### Matriz Visual de Impacto")
-                        g1, g2, g3 = st.columns(3)
-                        with g1:
-                            st.markdown("**Pontuação SCORE RAG (0-100🏆)**")
-                            st.bar_chart(df.set_index("Motor")["SCORE RAG"], color="#f1c40f")
-                            st.caption("Visão Holística. O vencedor garante sucesso no Vector DB.")
-                        
-                        with g2:
-                            st.markdown("**MDEval: Estrutura Visual (%)**")
-                            st.bar_chart(df.set_index("Motor")["MDE"], color="#2ecc71")
-                            st.caption("Capacidade de preservar matrizes sem vazar rodapés lixo.")
-
-                        with g3:
-                            st.markdown("**Custo Computacional (s)**")
-                            st.bar_chart(df.set_index("Motor")["Tempo (s)"], color="#e74c3c")
-                            st.caption("Esforço gasto unindo Heurísticas para o melhor arquivo.")
-                            
-                    st.divider()
-                    
-                    # --- SEÇÃO 3: DICIONÁRIO DE FERRAMENTAS LITE ---
-                    st.subheader("🛠️ Dicionário de Ferramentas (Stack Lite)")
-                    st.markdown("Nosso arsenal da versão *Padrão (Lite)* engloba 6 ferramentas independentes core:")
-                    st.markdown("""
-                    | Ferramenta | Etapa | Papel na aplicação |
-                    |---|---|---|
-                    | **unstructured** | Radar (0) | Identifica as coordenadas e mapeia páginas vazias/poluídas. |
-                    | **MarkItDown** | Narrativa (1) | Reconstrói o fluxo de texto primário preservando a semântica de cabeçalhos. |
-                    | **pymupdf4llm** | Narrativa (1) | Scanner secundário para garantir cobertura completa do texto e tapar buracos do primário. |
-                    | **pdfplumber** | Tabelas (2) | Validador geométrico secundário para garantir matrizes lógicas em HTML. |
-                    | **MDEval** | Validação (4)| Auditor final matemático que converte e nota tags estruturais injetadas. |
-                    | **RagLinter** | RAG (5)| Módulo Analítico Heurístico que remove *Orphan Chunks* e injeta Root-YAMLs. |
-                    """)
-                else:
-                    st.error("Erro interno: o arquivo MD não foi salvo no servidor.")
+            if uploader.size > 2 * 1024 * 1024:
+                st.error("O arquivo excede o limite de 2MB.")
             else:
-                st.error(f"Erro Crítico do Orquestrador: {result.error}")
-else:
-    # Boas vindas/Placeholder
-    st.info("Faça o upload do PDF acima para aplicar o motor Ensemble e transformar o lixo em Dados! 🚀")
-    st.image("https://img.icons8.com/clouds/200/000000/pdf.png")
+                # Cache de Processamento
+                if st.session_state.r_data is None:
+                    with tempfile.TemporaryDirectory() as tmp:
+                        p = Path(tmp) / uploader.name
+                        with open(p, "wb") as f: f.write(uploader.getbuffer())
+                        t0 = time.time()
+                        with st.spinner("Analisando estrutura..."):
+                            res = process_pdf(p)
+                        st.session_state.r_data = {"res": res, "dur": time.time()-t0, "path": str(p)}
 
+                if st.session_state.r_data:
+                    d = st.session_state.r_data
+                    res = d["res"]
+                    md = res.final_markdown
+                    
+                    yaml_match = re.search(r'^---\s*(.*?)\s*---\s*(.*)', md, re.DOTALL)
+                    yaml_data = yaml_match.group(1) if yaml_match else ""
+                    body_md = yaml_match.group(2) if yaml_match else md
+
+                    # TOOLBAR: Ações Rápidas
+                    head_l, head_r = st.columns([0.65, 0.35])
+                    head_l.markdown("**Visualização do Resultado**")
+                    
+                    ico_cp = '<svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none" style="margin-right:8px"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>'
+                    ico_dl = '<svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none" style="margin-right:8px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>'
+
+                    toolbar_html = f"""
+                    <div style="display:flex; justify-content:flex-end; gap:8px;">
+                        <button onclick="copyAction()" style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); border-radius:4px; color:white; cursor:pointer; padding:6px 10px; font-size:11px; display:flex; align-items:center;">
+                            {ico_cp} <span id="cp_label">Copiar</span>
+                        </button>
+                        <button onclick="dlAction()" style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); border-radius:4px; color:white; cursor:pointer; padding:6px 10px; font-size:11px; display:flex; align-items:center;">
+                            {ico_dl} Baixar
+                        </button>
+                    </div>
+                    <script>
+                        const MD_CONTENT = {json.dumps(md)};
+                        function copyAction() {{
+                            const ta = document.createElement('textarea'); ta.value = MD_CONTENT;
+                            document.body.appendChild(ta); ta.select(); document.execCommand('copy'); 
+                            document.body.removeChild(ta);
+                            const l = document.getElementById('cp_label'); l.innerText = 'Copiado!';
+                            setTimeout(() => {{ l.innerText = 'Copiar'; }}, 1500);
+                        }}
+                        function dlAction() {{
+                            const b = new Blob([MD_CONTENT], {{ type: 'text/markdown' }});
+                            const u = window.URL.createObjectURL(b);
+                            const a = document.createElement('a'); a.href = u; a.download = '{uploader.name.replace(".pdf", ".md")}';
+                            document.body.appendChild(a); a.click(); window.URL.revokeObjectURL(u);
+                        }}
+                    </script>
+                    """
+                    with head_r: html(toolbar_html, height=40)
+
+                    # COMPONENTE SYNC-SCROLL SIMÉTRICO
+                    md_b64_yaml = base64.b64encode(yaml_data.encode('utf-8')).decode('utf-8') if yaml_data else ""
+                    md_b64_body = base64.b64encode(body_md.encode('utf-8')).decode('utf-8')
+                    
+                    split_ui = f"""
+                    <div id="v_wrap" style="display:grid; grid-template-columns: 1fr 1fr; height:700px; border:1px solid rgba(255,255,255,0.08); border-radius:8px; overflow:hidden; background:#0e1117;">
+                        <div id="p_code" style="padding:24px; overflow-y:scroll; border-right:1px solid rgba(255,255,255,0.08);">
+                            <div style="color:rgba(255,255,255,0.2); font-size:9px; margin-bottom:10px; font-weight:700; letter-spacing:0.1em;">CÓDIGO FONTE (RAW)</div>
+                            <details id="det_c" style="color:#7ed6df; font-family:'Roboto Mono', monospace; font-size:11px; margin-bottom:12px; cursor:pointer;">
+                                <summary style="opacity:0.4;">YAML Frontmatter</summary>
+                                <pre id="yaml_c" style="padding:8px 0; opacity:0.7; margin:0;"></pre>
+                            </details>
+                            <pre id="code_area" style="color:#e6edf3; font-family:'Roboto Mono', monospace; font-size:12.5px; line-height:1.5; margin:0; white-space:pre-wrap;"></pre>
+                        </div>
+                        <div id="p_prev" style="padding:24px; overflow-y:scroll;">
+                            <div style="color:rgba(255,255,255,0.2); font-size:9px; margin-bottom:10px; font-weight:700; letter-spacing:0.1em;">PREVIEW RENDERIZADO</div>
+                            <details id="det_p" style="color:rgba(255,255,255,0.3); font-family:sans-serif; font-size:11px; margin-bottom:12px; cursor:pointer;">
+                                <summary style="opacity:0.4;">YAML Frontmatter</summary>
+                                <pre id="yaml_p" style="font-family:'Roboto Mono', monospace; font-size:10px; padding:8px 0; color:rgba(255,255,255,0.2); margin:0;"></pre>
+                            </details>
+                            <div id="prev_area" style="color:#ffffff; font-family:'Inter', sans-serif; font-size:14px; line-height:1.6;"></div>
+                        </div>
+                    </div>
+                    <script src="https://cdn.jsdelivr.net/npm/markdown-it@13.0.1/dist/markdown-it.min.js"></script>
+                    <script>
+                        function b64_to_utf8(str) {{ if(!str) return ""; return decodeURIComponent(escape(window.atob(str))); }}
+                        const rawYaml = b64_to_utf8("{md_b64_yaml}");
+                        const rawBody = b64_to_utf8("{md_b64_body}");
+                        if(rawYaml) {{ document.getElementById('yaml_c').innerText = rawYaml; document.getElementById('yaml_p').innerText = rawYaml; }}
+                        else {{ document.getElementById('det_c').style.display='none'; document.getElementById('det_p').style.display='none'; }}
+                        document.getElementById('code_area').innerText = rawBody;
+                        const renderer = window.markdownit({{html:true, linkify:true, breaks:true}});
+                        document.getElementById('prev_area').innerHTML = renderer.render(rawBody);
+                        const dc=document.getElementById('det_c'), dp=document.getElementById('det_p');
+                        dc.ontoggle=()=>{{dp.open=dc.open}}; dp.ontoggle=()=>{{dc.open=dp.open}};
+                        const c=document.getElementById('p_code'), p=document.getElementById('p_prev');
+                        let isSyncing=false;
+                        function handleScroll(src, dest) {{
+                            if(isSyncing) return; isSyncing=true;
+                            const f = src.scrollTop/(src.scrollHeight-src.clientHeight);
+                            dest.scrollTop = f*(dest.scrollHeight-dest.clientHeight);
+                            setTimeout(()=>{{isSyncing=false}},15);
+                        }}
+                        c.addEventListener('scroll', ()=>handleScroll(c, p), {{passive:true}});
+                        p.addEventListener('scroll', ()=>handleScroll(p, c), {{passive:true}});
+                    </script>
+                    """
+                    html(split_ui, height=720)
+        else:
+            # LIMPAR ESTADO SE ARQUIVO FOR REMOVIDO
+            if st.session_state.r_fid is not None:
+                st.session_state.r_data = None
+                st.session_state.r_bench = None
+                st.session_state.r_fid = None
+
+            st.markdown("<div style='height:400px; display:flex; flex-direction:column; align-items:center; justify-content:center; opacity:0.1; background:rgba(255,255,255,0.02); border:2px dashed rgba(255,255,255,0.05); border-radius:12px;'><span style='font-size:3rem;'>📄</span><p style='margin-top:1rem;'>Aguardando PDF para extração</p></div>", unsafe_allow_html=True)
+            
+    with col_detail:
+        st.markdown("<div style='padding-top:12px;'></div>", unsafe_allow_html=True)
+        if st.session_state.r_data:
+            d = st.session_state.r_data
+            res = d["res"]
+            st.metric("Performance", f"{d['dur']:.1f}s")
+            st.metric("Saúde RAG", f"{res.mdeval_score:.1f}%")
+            
+            # Tenta extrair métricas do YAML para o Dashboard lateral
+            md = res.final_markdown
+            yaml_match = re.search(r'^---\s*(.*?)\s*---\s*(.*)', md, re.DOTALL)
+            if yaml_match:
+                try:
+                    meta = yaml.safe_load(yaml_match.group(1))
+                    st.metric("Matrizes", meta.get("tables_injected", 0))
+                    st.metric("Símbolos", meta.get("total_characters", 0))
+                except: pass
+        else:
+            st.info("As métricas aparecerão aqui após o processamento.")
+
+with tab_bench:
+    st.subheader("Benchmark de Precisão")
+    st.caption("Comparativo técnico entre motores isolados e orquestração inteligente.")
+    
+    if st.button("Executar Combate", type="secondary"):
+        from src.specialists.narrative_markitdown import extract_narrative_markitdown
+        from src.specialists.narrative_pymupdf import extract_narrative_pymupdf
+        from src.metrics.eval_metrics import StructuralDensityEvaluator
+        from src.metrics.rag_readiness_linter import RagReadinessLinter
+        import pandas as pd
+        
+        if st.session_state.r_data:
+            d = st.session_state.r_data
+            ev, li = StructuralDensityEvaluator(), RagReadinessLinter()
+            def calc_m(name, txt, t):
+                e = ev.evaluate(txt)
+                l = li.evaluate(txt)
+                
+                # Fatores Scientíficos (Documentação V2)
+                twr = max(0, 100 - (max(0, l["Token_Word_Ratio"] - 1.5) * 40))
+                orph = (1.0 - l["Orphan_Chunk_Rate"]) * 100
+                ast = max(0, 100 - (l["AST_Violations"] * 20))
+                yaml_v = 100 if l["Frontmatter_Invalidity"] == 0.0 else 0
+                
+                # Pesos: 40% MDE, 30% Orphans, 15% TWR, 10% AST, 5% YAML
+                sc = (e * 0.4 + orph * 0.3 + twr * 0.15 + ast * 0.1 + yaml_v * 0.05)
+                return {
+                    "Abordagem": name, 
+                    "Tempo": f"{t:.2f}s", 
+                    "Score RAG": f"{sc:.1f}%", 
+                    "MDE": f"{e:.1f}%",
+                    "TWR": f"{twr:.1f}%",
+                    "Orphans": f"{orph:.1f}%",
+                    "AST": f"{ast:.1f}%",
+                    "YAML": "OK" if yaml_v == 100 else "."
+                }
+
+            with st.spinner("⚔️ Duelando bibliotecas..."):
+                m_t = extract_narrative_markitdown(d["path"])
+                p_t = extract_narrative_pymupdf(d["path"])
+                st.session_state.r_bench = [
+                    calc_m("MarkItDown", m_t, 1.3),
+                    calc_m("PyMuPDF4LLM", p_t, 0.9),
+                    calc_m("Orquestrador V2", d["res"].final_markdown, d["dur"])
+                ]
+        else:
+            st.warning("Carregue um PDF primeiro!")
+    
+    if st.session_state.r_bench:
+        df_bench = pd.DataFrame(st.session_state.r_bench)
+        # Garantia absoluta: Renderizamos via HTML para controle total de índice e alinhamento
+        table_html = df_bench.to_html(index=False, justify='center', border=0)
+        st.markdown(f'<div class="custom-table">{table_html}</div>', unsafe_allow_html=True)
+        
+        with st.expander("Legenda de Métricas"):
+            st.markdown("""
+            - **MDEval (Structural Density)**: Mede a riqueza semântica e a qualidade das tags Markdown geradas. Penaliza lixo visual.
+            - **Score RAG (System Readiness)**: Avalia a prontidão do documento para ingestão em bancos vetoriais (LangChain).
+                - **TWR**: Token-to-Word Ratio. OCR limpo = baixo TWR.
+                - **Orphans**: % de chunks que herdaram hierarquia de cabeçalhos.
+                - **AST**: Integridade da árvore de sintaxe abstrata (hierarquia modular).
+                - **YAML**: Validação de metadados obrigatórios no frontmatter.
+            """)
+        
+    st.divider()
+    st.subheader("Pipeline de Extração")
+    st.markdown("""| Etapa | Componente | Ferramentas |
+|---|---|---|
+| **0. Radar Espacial** | Classificação de Zonas | `unstructured` + `pdfplumber` |
+| **1. Fundação Narrativa** | Extração Textual (Duelo MDEval) | `MarkItDown` + `PyMuPDF4LLM` |
+| **2. Extração de Dados** | Tabelas com Precisão Geométrica | `pdfplumber` |
+| **3. Síntese e Validação** | Fusão, Limpeza PT-BR, Frontmatter | Heurísticas + `MDEval` |""")

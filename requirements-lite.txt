@@ -1,4 +1,6 @@
-# Dependências base (leves, sempre necessárias)
+# Dependências base (para ambientes com restrições de espaço)
+# Para instalação completa, use: pip install -r requirements.txt
+
 pdfplumber>=0.11.0
 streamlit>=1.30.0
 markdown>=3.6.0
@@ -7,9 +9,6 @@ python-Levenshtein>=0.25.0
 markitdown>=0.1.0
 pymupdf4llm>=0.0.10
 pyyaml>=6.0
-
-# Dependências Críticas RAG Linter
 tiktoken>=0.7.0
 langchain-text-splitters>=0.2.0
 markdown-it-py>=3.0.0
-

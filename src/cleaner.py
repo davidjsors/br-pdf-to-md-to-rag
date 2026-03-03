@@ -6,6 +6,17 @@ def clean_text_block(text: str) -> str:
     Remove "lixo" fixo como paginação, cabeçalhos de escalas de preço e formata quebras indesejadas.
     """
     if not text: return ""
+
+    # Fix Encoding: Repara casos onde UTF-8 foi interpretado como Latin-1 (comum em PDFs)
+    # Ex: "anÃ¡lise" -> "análise"
+    try:
+        # Se contiver a sequência característica de UTF-8-em-Latin1
+        if "Ã" in text or "Â" in text:
+            # Tenta converter
+            repaired = text.encode('latin1').decode('utf-8')
+            text = repaired
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        pass
     
     # 1. Remove markers de quebra de página (\x0c ou \f)
     text = text.replace('\x0c', '').replace('\f', '')

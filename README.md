@@ -28,6 +28,19 @@ Nossa abordagem não extrai tudo "assim como está". Nós utilizamos **8 ferrame
 
 ---
 
+## 🧬 O Avaliador de Saúde Estrutural (MDEval Custom)
+
+Inspirado pelo paper _MDEval: Evaluating Markdown Awareness of Large Language Models_ (SWUFE-DB-Group, WWW '25), substituímos contagens de letras por uma métrica científica implementada nativamente em `src/metrics/eval_metrics.py`.
+
+Como não usamos o GPT-4 para gerar um gabarito fixo em tempo real, desenvolvemos uma lógica **Reference-Free** (Cega), baseada na saúde puritana do DOM:
+
+1. **HTMLifying:** Todo Markdown (gerado pelo nosso Orquestrador V2 ou por libs concorrentes) é renderizado como HTML temporário para separar as strings textuais do **esqueleto em si** (`<table>, <h1>, <ul>`).
+2. **Riqueza Linear (Matrizes de Dados):** Encontrar tags de grande valor real como células de tabela (`<tr>, <td>`) ou listas (`<li>`) confere altos bônus de forma **Linear** ($ \gamma = 1.0 $). Quanto maior a tabela lida corretamente, maior a nota de saúde.
+3. **Decaimento D-Rule (Prevenção de Vandalismo):** Extratores de OCR ruins "alucinam" ou quebram o layout inserindo centenas de blocos de `<pre>` isolados ou `<h1>` onde deveria ser texto de base. Para tags estruturais e formatações brutas (`h1-h6`, `pre`, `b`, `hr`), implementamos a regra **Decayed Rule-based (D-Rule)**. Aqui a matemática decai em ($ \gamma = 0.5 $). O primeiro negrito importa muito; o segundo vale metade; a partir do quarto, a tag torna-se insignificante. Isso impede os geradores de "hackearem" um score maior apenas vomitando volume infundado. 
+4. **O Pente Fino do Lixo (Regex Penalty):** A nota da biblioteca despenca drasticamente se o HTML riquíssimo mantiver resíduos como `Página 4 de 10` ou réguas financeiras isoladas soltas ao relento. Dessa forma, punimos a IA burra.
+
+---
+
 ## 🚀 Quick Start (Usando na Web)
 
 Acesse a nossa Interface Web (Hospedada no Streamlit Community Cloud gratuito):
@@ -114,5 +127,8 @@ if resultado.success:
 ## 📚 Referências e Créditos
 Este projeto integra métricas inspiradas no **MDEval-Benchmark**, que usamos no estágio de validação estrutural do Juiz Mestre. Agradecimentos ao grupo **SWUFE-DB-Group** (WWW '25).
 
-## 📄 Licença
+## � Política de Contribuição e Agentes Autônomos (AI Agents)
+Este repositório é ativamente gerido em arquitetura Pair-Programming com agentes de IA. Existe uma regra suprema de infraestrutura e governança (Security Constraint): **Nenhum agente autônomo (Codium, Cursor, Claude Code, Antigravity, Devin) possui a autorização para realizar comandos de `git commit` ou `git push` automaticamente sem a explícita permissão verbal ("pode commitar") do usuário (Engenheiro Responsável).** A revisão de código humana é passagem obrigatória para a entrada na branch Main.
+
+## �📄 Licença
 [MIT](LICENSE)

@@ -1,4 +1,6 @@
 import re
+import math
+from collections import defaultdict
 import markdown
 from bs4 import BeautifulSoup
 import Levenshtein
@@ -63,14 +65,24 @@ class StructuralDensityEvaluator:
         """
         self.gamma = gamma
         
-        # Tags de Dados Reais (Volume de Matrizes e Tópicos) -> Sem Decaimento (Linear)
+        # --- CLASS 1: TAGS DE DADOS REAIS (Linear: Sem Decaimento -> Gama 1.0) ---
+        # Matrizes e Listas são massivas em PDFs. Cada linha deve dar a mesma pontuação.
         self.linear_tags = {'table', 'tr', 'th', 'td', 'ul', 'ol', 'li'}
         
-        # Tags de Hierarquia e Cosmética -> Com Decaimento (Punição por Vandalismo/Repetição)
-        # Blocos de código, aspas falsas e excesso de formatação indicam quebra de leitura de OCR
-        self.decay_tags = {'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'b', 'strong', 'i', 'em', 'hr', 'pre', 'code', 'blockquote', 'math'}
+        # --- CLASS 2: TAGS COSMÉTICAS/HIERARQUIA (Decaimento -> Gama 0.5) ---
+        # Sofrem punição caso ferramentas ruins de OCR repitam em looping (vandalismo/prolixidade)
+        self.decay_tags = {'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'b', 'strong', 'i', 'em', 'hr', 'pre', 'code', 'blockquote', 'math', 'p', 'a'}
         
         self.valuable_tags = self.linear_tags.union(self.decay_tags)
+        
+        # --- PESOS BASE (MDEval: High Impact vs Secondary) ---
+        # O estudo confere peso máximo (10) para estrutura primária e peso menor (5) para outros
+        
+        # Tags de Alto Impacto Estrutural (Peso Base = 10)
+        self.high_impact_tags = {'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'pre', 'code', 'math', 'ul', 'ol', 'li', 'b', 'strong', 'table', 'tr', 'th', 'td'}
+        
+        # Tags Secundárias (Peso Base = 5)
+        self.secondary_tags = {'i', 'em', 'blockquote', 'a', 'hr', 'p'}
         
         # Padrões de Lixo Visual Brasileiro compilados para a penalidade
         self.garbage_patterns = [
@@ -93,26 +105,25 @@ class StructuralDensityEvaluator:
 
     def calculate_d_rule_bonus(self, tags: list[str]) -> float:
         """
-        Calcula o Score Estrutural base considerando a natureza da tag (Linear vs Decaimento).
+        Calcula o Score Estrutural base cruzando o Peso Base (10 ou 5) com a Natureza (Linear ou Decaimento).
         """
         bonus_score = 0.0
         tag_counts: dict[str, int] = defaultdict(int)
         
         for tag in tags:
+            # 1. Definir o Peso Base pelo Impacto
+            base_score = 10.0 if tag in self.high_impact_tags else 5.0
+            
+            # 2. Verificar o status de repetição da tag
             current_count = tag_counts[tag]
             
-            # Se a tag for estrutural linear (Dados/Tabelas/Listas), peso sempre 1.0 (sem decaimento)
+            # 3. Aplicar o Multiplicador Linear vs D-Rule
             if tag in self.linear_tags:
-                weight = 1.0
-                # Super-bônus para o início de uma tabela ou linha pura, pois isso é o Santo Graal do extrator
-                base_multiplier = 2.0 if tag in ['table', 'tr'] else 1.0
-                
-            # Se a tag for cosmética/hierárquica, sofre o Decaimento D-Rule ($ \gamma^{repetições} $)
+                decay_multiplier = 1.0 # Dados faturam linearmente
             else:
-                weight = self.gamma ** current_count
-                base_multiplier = 1.0
+                decay_multiplier = self.gamma ** current_count # Cosmética sofre o achatamento
             
-            bonus_score += (weight * base_multiplier)
+            bonus_score += (base_score * decay_multiplier)
             tag_counts[tag] += 1
             
         return bonus_score
@@ -158,7 +169,7 @@ class StructuralDensityEvaluator:
         # Curva de achatamento para converter a pontuação infinita em um Percentual 0-100%
         # Quanto maior o score cru, mais ele tende a 100%. Uma tabela linda ou 5 títulos geram ~80%+
         # score = 100 * (1 - e^(-raw_score / constante_fator))
-        normalized_percentage = 100.0 * (1.0 - math.exp(-raw_score / 15.0))
+        normalized_percentage = 100.0 * (1.0 - math.exp(-raw_score / 150.0))
         
         return float(round(normalized_percentage, 2))
 

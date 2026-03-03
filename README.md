@@ -25,7 +25,7 @@ O projeto utiliza uma pipeline de extração orquestrada em etapas sequenciais, 
 | 0. Radar Espacial | `spatial_scanner` | `unstructured`, `pdfplumber` | Classifica as zonas de cada página (texto, tabela, imagem) e constrói o manifesto do documento. |
 | 1. Fundação Narrativa | `narrative_judge` | `MarkItDown`, `PyMuPDF4LLM` | Extrai o fluxo textual primário. Avalia a saúde estrutural de ambos os motores via MDEval e seleciona o resultado com melhor pontuação. |
 | 2. Extração de Dados | `data_judge` | `pdfplumber` | Extrai tabelas com precisão geométrica das páginas sinalizadas pelo Radar. |
-| 3. Síntese e Validação | `master_judge` | Heurísticas customizadas | Funde tabelas no esqueleto narrativo, aplica filtros morfológicos e injeta metadados YAML (frontmatter). |
+| 3. Síntese e Validação | `master_judge` | MDEval e Heurísticas customizadas | Funde tabelas no esqueleto narrativo, aplica filtros morfológicos e injeta metadados YAML (frontmatter). |
 
 > Documentação técnica detalhada em [docs/pipeline_architecture_v2.md](docs/pipeline_architecture_v2.md).
 

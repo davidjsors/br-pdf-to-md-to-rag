@@ -100,24 +100,27 @@ if uploaded_file is not None:
                         t_col.markdown("**📝 Código Fonte**")
                         
                         # Botões minimalistas injetados via HTML para controle total de estilo
-                        md_b64 = base64.b64encode(md_content.encode()).decode()
                         # Escapando o conteúdo para JS
                         js_safe_content = md_content.replace('\\', '\\\\').replace('`', '\\`').replace('$', '\\$')
+                        safe_filename = uploaded_file.name.replace(".pdf", "") + ".md"
                         
                         actions_html = f"""
                         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-                        <div style="display: flex; justify-content: flex-end; gap: 12px; padding-top: 5px; font-family: sans-serif;">
+                        <div style="display: flex; justify-content: flex-end; gap: 18px; padding-top: 5px; background: transparent;">
                             <button id="copyBtn" onclick="copyToClipboard()" 
                                     title="Copiar Markdown"
-                                    style="background: transparent; border: 1px solid #444; border-radius: 4px; cursor: pointer; padding: 6px 10px; color: #ffffff; font-size: 14px; transition: 0.2s; display: flex; align-items: center; justify-content: center; width: 38px; height: 32px;">
+                                    style="background: transparent; border: none; cursor: pointer; color: #ffffff; font-size: 18px; transition: 0.2s; display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; opacity: 0.8;">
                                 <i id="copyIcon" class="fa-regular fa-copy"></i>
                             </button>
-                            <a href="data:text/markdown;base64,{md_b64}" download="{md_path.name}" 
+                            <a id="downloadBtn" onclick="downloadFile()" 
                                title="Baixar Markdown"
-                               style="background: transparent; border: 1px solid #444; border-radius: 4px; cursor: pointer; padding: 6px 10px; color: #ffffff; font-size: 14px; text-decoration: none; display: flex; align-items: center; justify-content: center; transition: 0.2s; width: 38px; height: 32px;">
+                               style="background: transparent; border: none; cursor: pointer; color: #ffffff; font-size: 18px; text-decoration: none; display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; opacity: 0.8; transition: 0.2s;">
                                 <i class="fa-solid fa-download"></i>
                             </a>
                         </div>
+                        <style>
+                            button:hover, a:hover {{ opacity: 1 !important; transform: scale(1.1); }}
+                        </style>
                         <script>
                         function copyToClipboard() {{
                             const text = `{js_safe_content}`;
@@ -128,13 +131,10 @@ if uploaded_file is not None:
                             try {{
                                 document.execCommand('copy');
                                 const icon = document.getElementById('copyIcon');
-                                const btn = document.getElementById('copyBtn');
                                 icon.className = 'fa-solid fa-check';
-                                btn.style.borderColor = '#2ecc71';
                                 icon.style.color = '#2ecc71';
                                 setTimeout(() => {{ 
                                     icon.className = 'fa-regular fa-copy'; 
-                                    btn.style.borderColor = '#444';
                                     icon.style.color = '#ffffff';
                                 }}, 2000);
                             }} catch (err) {{
@@ -142,10 +142,23 @@ if uploaded_file is not None:
                             }}
                             document.body.removeChild(textArea);
                         }}
+                        
+                        function downloadFile() {{
+                            const text = `{js_safe_content}`;
+                            const blob = new Blob([text], {{ type: 'text/markdown' }});
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = "{safe_filename}";
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            URL.revokeObjectURL(url);
+                        }}
                         </script>
                         """
                         with a_col:
-                            st.components.v1.html(actions_html, height=45)
+                            st.components.v1.html(actions_html, height=40)
                         
                         with st.container(height=500, border=True):
                             st.code(md_content, language="markdown")
